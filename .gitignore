@@ -1,2 +1,4 @@
 inventaire.csv
 models/__pycache__/
+tests/
+.pytest_cache/

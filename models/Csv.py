@@ -1,18 +1,36 @@
 import csv
 
 class Csv:
+    """Simple handler for CSV file operations.
+    
+    Provides methods to read, write, and append data to CSV files 
+    with automatic header management.
+    """
     def __init__(self, file):
-        """Initializes the Csv class with a file path."""
+        """Initializes the Csv class with a file path.
+
+        Args:
+            file (String): Path to the CSV file to be manipulated.
+        """
         self.file = file
 
     def read(self):
-        """Reads the CSV file and returns a list of dictionaries."""
+        """Reads data from CSV file.
+
+        Returns:
+            list: List of dictionaries where each dictionary represents a row.
+        """
         with open(self.file, mode='r', newline='', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             return list(reader)
         
     def write(self, data, header=None):
-        """Writes a dictionnary list to the CSV file."""
+        """Writes data to CSV file.
+
+        Args:
+            data (list): List of dictionaries to write.
+            header (list, optional): Column headers. Defaults to None.
+        """
         with open(self.file, mode='w', newline='', encoding='utf-8') as f:
             if header is None:
                 header = data[0].keys() if data else []
@@ -22,7 +40,11 @@ class Csv:
             writer.writerows(data)
 
     def add(self, line):
-        """Adds a line to the CSV file."""
+        """Appends a single line to CSV file.
+
+        Args:
+            line (dict): Dictionary representing a row to add.
+        """
         with open(self.file, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=line.keys())
             if f.tell() == 0:  # If file is empty, write header

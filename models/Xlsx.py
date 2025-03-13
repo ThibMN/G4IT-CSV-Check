@@ -60,3 +60,70 @@ class XlsxHandler:
 
         sheet.append(line.values())
         wb.save(self.file)
+
+        def validate_dates(self, date_column):
+    """
+    Checks if dates in XLSX are in correct mm-dd-yyyy format.
+    
+    Args:
+        date_column (str): Name of the column containing dates
+        
+    Returns:
+        bool: True if dates need switching (month > 12 found), False otherwise
+    """
+    data = self.load_data()
+    
+    for row in data:
+        if date_column not in row:
+            raise KeyError(f"Column '{date_column}' not found in XLSX")
+        
+        try:
+            if not row[date_column]:  # Skip empty cells
+                continue
+                
+            date_str = str(row[date_column])
+            if '/' in date_str:
+                month, day, year = map(int, date_str.split('/'))
+            else:
+                month, day, year = map(int, date_str.split('-'))
+            if month > 12:
+                return True
+        except (ValueError, AttributeError):
+            continue
+            
+    return False
+
+    def fix_dates(self, date_column):
+        """
+        Fixes dates by switching month and day if month > 12.
+        Also standardizes separator to hyphen.
+        
+        Args:
+            date_column (str): Name of the column containing dates
+            
+        Returns:
+            list: Corrected data with fixed dates
+        """
+        data = self.load_data()
+        
+        for row in data:
+            try:
+                if not row[date_column]:  # Skip empty cells
+                    continue
+                    
+                date_str = str(row[date_column])
+                if '/' in date_str:
+                    month, day, year = map(int, date_str.split('/'))
+                else:
+                    month, day, year = map(int, date_str.split('-'))
+                    
+                if month > 12:
+                    # Swap month and day and standardize to hyphen
+                    row[date_column] = f"{day:02d}-{month:02d}-{year}"
+                else:
+                    # Standardize to hyphen without swapping
+                    row[date_column] = f"{month:02d}-{day:02d}-{year}"
+            except (ValueError, AttributeError):
+                continue
+        
+        return data

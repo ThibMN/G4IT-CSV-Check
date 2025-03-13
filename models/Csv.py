@@ -50,7 +50,7 @@ class CsvHandler:
             if f.tell() == 0:  # If file is empty, write header
                 writer.writeheader()
             writer.writerow(line)
-            
+
     def validate_dates(self, date_column):
     """
     Checks if dates in CSV are in correct mm-dd-yyyy format.
@@ -79,33 +79,33 @@ class CsvHandler:
             
     return False
 
-def fix_dates(self, date_column):
-    """
-    Fixes dates by switching month and day if month > 12.
-    Also standardizes separator to hyphen.
-    
-    Args:
-        date_column (str): Name of the column containing dates
+    def fix_dates(self, date_column):
+        """
+        Fixes dates by switching month and day if month > 12.
+        Also standardizes separator to hyphen.
         
-    Returns:
-        list: Corrected data with fixed dates
-    """
-    data = self.load_data()
-    
-    for row in data:
-        try:
-            if '/' in row[date_column]:
-                month, day, year = map(int, row[date_column].split('/'))
-            else:
-                month, day, year = map(int, row[date_column].split('-'))
-                
-            if month > 12:
-                # Swap month and day and standardize to hyphen
-                row[date_column] = f"{day:02d}-{month:02d}-{year}"
-            else:
-                # Standardize to hyphen without swapping
-                row[date_column] = f"{month:02d}-{day:02d}-{year}"
-        except (ValueError, AttributeError):
-            continue
-    
-    return data
+        Args:
+            date_column (str): Name of the column containing dates
+            
+        Returns:
+            list: Corrected data with fixed dates
+        """
+        data = self.load_data()
+        
+        for row in data:
+            try:
+                if '/' in row[date_column]:
+                    month, day, year = map(int, row[date_column].split('/'))
+                else:
+                    month, day, year = map(int, row[date_column].split('-'))
+                    
+                if month > 12:
+                    # Swap month and day and standardize to hyphen
+                    row[date_column] = f"{day:02d}-{month:02d}-{year}"
+                else:
+                    # Standardize to hyphen without swapping
+                    row[date_column] = f"{month:02d}-{day:02d}-{year}"
+            except (ValueError, AttributeError):
+                continue
+        
+        return data

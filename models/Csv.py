@@ -52,32 +52,32 @@ class CsvHandler:
             writer.writerow(line)
 
     def validate_dates(self, date_column):
-    """
-    Checks if dates in CSV are in correct mm-dd-yyyy format.
-    
-    Args:
-        date_column (str): Name of the column containing dates
+        """
+        Checks if dates in CSV are in correct mm-dd-yyyy format.
         
-    Returns:
-        bool: True if dates need switching (month > 12 found), False otherwise
-    """
-    data = self.load_data()
-    
-    for row in data:
-        if date_column not in row:
-            raise KeyError(f"Column '{date_column}' not found in CSV")
-        
-        try:
-            if '/' in row[date_column]:
-                month, day, year = map(int, row[date_column].split('/'))
-            else:
-                month, day, year = map(int, row[date_column].split('-'))
-            if month > 12:
-                return True
-        except (ValueError, AttributeError):
-            continue
+        Args:
+            date_column (str): Name of the column containing dates
             
-    return False
+        Returns:
+            bool: True if dates need switching (month > 12 found), False otherwise
+        """
+        data = self.load_data()
+        
+        for row in data:
+            if date_column not in row:
+                raise KeyError(f"Column '{date_column}' not found in CSV")
+            
+            try:
+                if '/' in row[date_column]:
+                    month, day, year = map(int, row[date_column].split('/'))
+                else:
+                    month, day, year = map(int, row[date_column].split('-'))
+                if month > 12:
+                    return True
+            except (ValueError, AttributeError):
+                continue
+                
+        return False
 
     def fix_dates(self, date_column):
         """

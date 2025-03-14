@@ -144,7 +144,7 @@ class XlsxHandler:
                 continue
 
         return data
-        def count_models(self):
+    def count_models(self):
         """
         Counts the number of unique models in the XLSX file.
         

@@ -101,10 +101,10 @@ class CsvHandler:
                     
                 if month > 12:
                     # Swap month and day and standardize to hyphen
-                    row[date_column] = f"{day:02d}-{month:02d}-{year}"
+                    row[date_column] = f"{year}-{day:02d}-{month:02d}"
                 else:
                     # Standardize to hyphen without swapping
-                    row[date_column] = f"{month:02d}-{day:02d}-{year}"
+                    row[date_column] = f"{year}-{month:02d}-{day:02d}"
             except (ValueError, AttributeError):
                 continue
         

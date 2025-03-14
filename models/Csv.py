@@ -109,3 +109,17 @@ class CsvHandler:
                 continue
         
         return data
+    def count_models(self):
+        """
+        Counts the number of unique models in the CSV file.
+        
+        Returns:
+            int: Number of unique models
+        """
+        data = self.load_data()
+        models = set(row['modele'] for row in data)
+        dict_models = {model: 0 for model in models}
+        for row in data:
+            if row['modele'] in dict_models:
+                dict_models[row['modele']] += 1
+        return dict_models

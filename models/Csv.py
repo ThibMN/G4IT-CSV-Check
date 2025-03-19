@@ -1,4 +1,5 @@
 import csv as csv_module
+from .utils import validate_columns, G4IT_COLUMN_SPECS
 
 class CsvHandler:
     """Simple handler for CSV file operations.
@@ -185,3 +186,50 @@ class CsvHandler:
         
         print(f"\nRésumé: {fixed_count} dates inversées corrigées, {len(unfixable_rows)} lignes non traitables.")
         return data
+
+    def validate_columns(self, column_specs=None):
+        """
+        Validates that the CSV file contains all required columns 
+        with correct data types.
+        
+        Args:
+            column_specs (dict, optional): Column specifications. 
+                                          Defaults to G4IT_COLUMN_SPECS.
+        
+        Returns:
+            dict: Validation report with errors and overall validity
+        """
+        try:
+            data = self.load_data()
+            if not data:
+                return {
+                    "is_valid": False,
+                    "general_error": f"Impossible de charger les données du fichier '{self.file}'"
+                }
+                
+            specs = column_specs if column_specs else G4IT_COLUMN_SPECS
+            report = validate_columns(data, specs)
+            
+            # Print summary
+            if report["is_valid"]:
+                print(f"Validation réussie: Le fichier '{self.file}' respecte les spécifications.")
+            else:
+                print(f"Validation échouée: Le fichier '{self.file}' contient des erreurs:")
+                
+                if report.get("missing_required_columns"):
+                    print(f"  - Colonnes obligatoires manquantes: {', '.join(report['missing_required_columns'])}")
+                
+                if report.get("type_errors"):
+                    print(f"  - {len(report['type_errors'])} erreurs de type de données:")
+                    for i, error in enumerate(report["type_errors"][:5]):
+                        print(f"    * Ligne {error['row']}, colonne '{error['column']}': {error['error']}")
+                    if len(report["type_errors"]) > 5:
+                        print(f"    * ... et {len(report['type_errors'])-5} autres erreurs.")
+            
+            return report
+            
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "general_error": f"Erreur lors de la validation: {str(e)}"
+            }

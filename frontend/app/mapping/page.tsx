@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertCircle, HelpCircle, CheckCircle, ChevronDown } from "lucide-react";
 import { useHeaderMappingStore } from "@/store/header-mapping-store";
 import Navbar from "@/components/layout/navbar";
+import { useNotification } from "@/components/ui/notifications";
 
 // Définition des types
 interface ExpectedHeader {
@@ -65,6 +66,9 @@ const mockDetectedHeaders: DetectedHeader[] = [
   { name: "État", index: 4, mappedTo: null },
 ];
 
+// Import the applyMapping function
+import { applyMapping } from "@/services/api";
+
 export default function HeaderMapping() {
   // États locaux
   const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>(mockDetectedHeaders);
@@ -96,18 +100,68 @@ export default function HeaderMapping() {
     ));
   };
 
-  // Valider le mapping
-  const validateMapping = () => {
-    const newMapping: Record<number, string> = {};
-
+  // Update the validateMapping function
+  const validateMapping = async () => {
+    // Vérifier si tous les en-têtes obligatoires sont mappés
+    const requiredMappings = Object.keys(EXPECTED_HEADERS).filter(
+      key => EXPECTED_HEADERS[key].required
+    );
+    
+    const mappedHeaders = detectedHeaders
+      .filter(header => header.mappedTo)
+      .map(header => header.mappedTo);
+    
+    const missingRequired = requiredMappings.filter(
+      req => !mappedHeaders.includes(req)
+    );
+    
+    if (missingRequired.length > 0) {
+      notification.error(`Veuillez mapper tous les champs obligatoires: ${missingRequired.join(', ')}`);
+      return;
+    }
+    
+    // Créer l'objet de mapping
+    const newMapping: Record<string, string> = {};
+    
     detectedHeaders.forEach(header => {
       if (header.mappedTo) {
-        newMapping[header.index] = header.mappedTo;
+        newMapping[header.index.toString()] = header.mappedTo;
       }
     });
-
+    
+    // Sauvegarder le mapping dans le store local
     setMapping(newMapping);
-    alert("Mapping sauvegardé avec succès !");
+    
+    // Récupérer le chemin du fichier temporaire depuis localStorage
+    const tempFilePath = localStorage.getItem('tempFilePath');
+    
+    if (!tempFilePath) {
+      notification.error("Aucun fichier à traiter. Veuillez d'abord télécharger un fichier sur la page d'accueil.");
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Envoyer le mapping au backend
+      const result = await applyMapping(tempFilePath, newMapping);
+      
+      if (result.success) {
+        notification.success("Mapping appliqué avec succès !");
+        
+        // Attendre un peu avant de rediriger
+        setTimeout(() => {
+          router.push('/equipments');
+        }, 1500);
+      } else {
+        notification.error("Erreur lors de l'application du mapping: " + result.message);
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de l'application du mapping:", error);
+      notification.error("Erreur lors de l'application du mapping: " + (error.message || "Erreur inconnue"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Vérifier si tous les champs obligatoires sont mappés

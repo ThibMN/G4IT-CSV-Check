@@ -39,6 +39,7 @@
 /frontend/next-env.d.ts
 
 # python back-end
+/backend/__pycache__/
 /backend/inventaire.csv
 /backend/models/__pycache__/
 /backend/tests/

@@ -17,6 +17,14 @@ class XlsxHandler:
         """
         self.file = file
 
+    def column_exists(self, column_name):
+        """Vérifie si une colonne existe dans le fichier Excel"""
+        try:
+            df = pd.read_excel(self.file_path)
+            return column_name in df.columns
+        except Exception as e:
+            logger.error(f"Erreur lors de la vérification de la colonne: {str(e)}")
+            return False
 
     def load_data(self):
         """Reads data from XLSX file.

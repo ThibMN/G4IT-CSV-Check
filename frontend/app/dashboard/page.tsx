@@ -26,6 +26,8 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { LoaderData } from "@/components/ui/loader-data";
 import { useEquipmentStore } from "@/store/equipment-store";
 import { useErrorStore } from "@/store/error-store";
+// Import validateFile from API service
+import { validateFile } from "@/services/api";
 import { parseFile } from "@/lib/file-parser";
 import { processFileData, FileData } from "@/lib/validation-utils";
 
@@ -58,7 +60,7 @@ export default function Dashboard() {
     setErrorMessage(null);
   };
 
-  // Fonction pour traiter un fichier
+  // Fonction pour traiter un fichier - Modifiée pour utiliser l'API backend
   const handleProcessFile = async (fileId: number) => {
     const fileIndex = fileId - 1;
     const file = uploadedFiles[fileIndex];
@@ -69,37 +71,61 @@ export default function Dashboard() {
     setErrorMessage(null);
 
     try {
-      // Analyser le fichier
-      const parseResult = await parseFile(file);
-
-      if (parseResult.error) {
-        setErrorMessage(parseResult.error);
+      // Utiliser l'API backend pour valider le fichier au lieu du parsing côté client
+      const validationResult = await validateFile(file);
+      
+      if (!validationResult.is_valid) {
+        // Gérer les erreurs de validation
+        if (validationResult.missing_required_columns?.length > 0) {
+          setErrorMessage(`Colonnes obligatoires manquantes: ${validationResult.missing_required_columns.join(', ')}`);
+        } else if (validationResult.type_errors?.length > 0) {
+          // Convertir les erreurs de type en format compatible avec le store d'erreurs
+          const formattedErrors = validationResult.type_errors.map(err => ({
+            id: Math.random(),
+            type: "Erreur de type",
+            colonne: err.column,
+            valeur: err.value || "",
+            gravite: err.critical ? "critique" : "mineure",
+            suggestion: err.suggestion || "",
+            corrigee: false
+          }));
+          
+          setErrors(formattedErrors);
+          
+          // Si des erreurs critiques sont présentes, rediriger vers la page de gestion des erreurs
+          const hasCritical = formattedErrors.some(err => err.gravite === "critique");
+          if (hasCritical) {
+            // Stocker le chemin du fichier temporaire pour une utilisation ultérieure
+            if (validationResult.temp_file_path) {
+              localStorage.setItem('tempFilePath', validationResult.temp_file_path);
+            }
+            
+            setTimeout(() => {
+              router.push('/error-management');
+            }, 1000);
+            return;
+          }
+        } else if (validationResult.general_error) {
+          setErrorMessage(validationResult.general_error);
+        }
+        
         setProcessingFiles(prev => prev.filter(id => id !== fileId));
         return;
       }
-
-      // Vérifier les données et détecter les erreurs
-      const { errors, processedData, canExport } = processFileData(parseResult.data);
-
-      // Mettre à jour le store avec les données traitées
-      setEquipments(processedData as any[]);
-
+      
+      // Si la validation est réussie, stocker le chemin du fichier temporaire
+      if (validationResult.temp_file_path) {
+        localStorage.setItem('tempFilePath', validationResult.temp_file_path);
+      }
+      
+      // Mettre à jour le store avec les données traitées (si disponibles)
+      if (validationResult.processed_data) {
+        setEquipments(validationResult.processed_data);
+      }
+      
       // Ajouter à la liste des fichiers traités
       setProcessingFiles(prev => prev.filter(id => id !== fileId));
       setProcessedFiles(prev => [...prev, fileId]);
-
-      // Si des erreurs sont détectées
-      if (errors.length > 0) {
-        setErrors(errors);
-
-        // Si erreurs critiques, rediriger vers la page de gestion des erreurs
-        if (!canExport) {
-          setTimeout(() => {
-            router.push('/error-management');
-          }, 1000);
-          return;
-        }
-      }
 
     } catch (err: any) {
       setErrorMessage(`Erreur lors du traitement du fichier : ${err.message || 'Erreur inconnue'}`);

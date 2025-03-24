@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useEquipmentStore, ConsolidatedEquipment, Equipment } from "@/store/equipment-store";
 import Navbar from "@/components/layout/navbar";
+import { useNotification } from "@/components/ui/notifications";
 
 // Données d'exemple pour la démo
 const EXAMPLE_EQUIPMENTS: Equipment[] = [
@@ -205,9 +206,12 @@ export default function ConsolidationPage() {
   };
 
   // Enregistrer les modifications d'un équipement
+  const notification = useNotification();
+  
+  // Mettre à jour la fonction handleSaveEquipment pour utiliser les notifications
   const handleSaveEquipment = (index: number, updatedEquipment: ConsolidatedEquipment) => {
     updateConsolidatedEquipment(index, updatedEquipment);
-    setSuccessMessage("La quantité a été mise à jour avec succès !");
+    notification.success("La quantité a été mise à jour avec succès !");
   };
 
   // Recharger les données en cas d'erreur

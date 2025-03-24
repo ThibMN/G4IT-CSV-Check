@@ -15,6 +15,15 @@ class CsvHandler:
         """
         self.file = file
 
+    def column_exists(self, column_name):
+        """Vérifie si une colonne existe dans le fichier CSV"""
+        try:
+            df = pd.read_csv(self.file_path, sep=';', encoding='utf-8')
+            return column_name in df.columns
+        except Exception as e:
+            logger.error(f"Erreur lors de la vérification de la colonne: {str(e)}")
+            return False
+
     def load_data(self):
         """Reads data from CSV file.
 

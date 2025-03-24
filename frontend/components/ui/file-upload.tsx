@@ -6,6 +6,8 @@ import { motion } from "motion/react";
 import { IconUpload } from "@tabler/icons-react";
 import { useDropzone } from "react-dropzone";
 import { Trash2, X } from "lucide-react";
+import { useFileProcessor } from '@/hooks/useFileProcessor';
+import { Loader2 } from 'lucide-react';
 
 const mainVariant = {
   initial: {
@@ -216,6 +218,233 @@ export function GridPattern() {
           );
         })
       )}
+    </div>
+  );
+}
+
+interface ValidationResult {
+  is_valid: boolean;
+  missing_required_columns: string[];
+  type_errors: Array<{
+    row: number;
+    column: string;
+    error: string;
+  }>;
+  temp_file_path?: string;
+  original_filename?: string;
+  file_format?: string;
+  general_error?: string;
+}
+
+export default function FileUploader() {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const { isLoading, validationResult, error, processFile, correctDates, downloadFile, cleanup } = useFileProcessor();
+  const [correctedFilePath, setCorrectedFilePath] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Gestion du changement de fichiers avec FileUpload
+  const handleFilesChange = (files: File[]) => {
+    setSelectedFiles(files);
+    // Reset des résultats antérieurs
+    setCorrectedFilePath(null);
+  };
+  
+  // Traitement du fichier
+  const handleUpload = async () => {
+    if (!selectedFiles.length) return;
+    
+    setIsProcessing(true);
+    try {
+      console.log("Envoi du fichier au backend...");
+      const result = await processFile(selectedFiles[0]);
+      console.log("Résultat de la validation backend:", result);
+      setCorrectedFilePath(null);
+    } catch (err) {
+      console.error("Erreur:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Correction des dates
+  const handleDateCorrection = async (column: string) => {
+    if (!validationResult?.temp_file_path) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await correctDates(validationResult.temp_file_path, column);
+      if (result?.success && result.corrected_file_path) {
+        setCorrectedFilePath(result.corrected_file_path);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Téléchargement du fichier traité
+  const handleDownload = async () => {
+    const fileToDownload = correctedFilePath || validationResult?.temp_file_path;
+    if (!fileToDownload) return;
+    
+    setIsProcessing(true);
+    try {
+      await downloadFile(fileToDownload);
+      
+      // Nettoyage des fichiers temporaires après téléchargement
+      if (correctedFilePath) {
+        await cleanup(correctedFilePath);
+      }
+      if (validationResult?.temp_file_path) {
+        await cleanup(validationResult.temp_file_path);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  return (
+    <div className="container mx-auto py-8">
+      <h1 className="text-2xl font-bold mb-6">G4IT CSV Checker</h1>
+      
+      {/* Upload avec le composant FileUpload */}
+      <div className="mb-6">
+        <FileUpload onChange={handleFilesChange} />
+        
+        {selectedFiles.length > 0 && (
+          <div className="mt-4 flex justify-center">
+            <button 
+              onClick={handleUpload} 
+              disabled={isProcessing || isLoading}
+              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 transition-colors text-white px-6 py-3 rounded-md disabled:bg-blue-300"
+            >
+              {isProcessing || isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Traitement en cours...
+                </>
+              ) : (
+                'Valider le fichier'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+      
+      {/* Affichage des erreurs */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-100 border border-red-400 text-red-700 p-4 mb-6 rounded-lg shadow-sm"
+        >
+          <p className="font-semibold">Erreur</p>
+          <p>{error}</p>
+        </motion.div>
+      )}
+      
+      {/* Affichage des résultats de validation */}
+      {validationResult && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <h2 className="text-xl font-semibold mb-4">Résultat de validation</h2>
+          
+          {validationResult.is_valid ? (
+            <div className="bg-green-100 border border-green-400 text-green-700 p-6 rounded-lg shadow-sm">
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="font-semibold">Le fichier est valide et prêt pour G4IT !</p>
+              </div>
+              <p className="mt-2 text-green-600">Toutes les colonnes requises sont présentes et les données sont au bon format.</p>
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 p-6 rounded-lg shadow-sm">
+              <h3 className="font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Le fichier contient des erreurs
+              </h3>
+              
+              {validationResult.missing_required_columns?.length > 0 && (
+                <div className="mt-4 p-3 bg-yellow-100 rounded-md">
+                  <p className="font-semibold">Colonnes obligatoires manquantes :</p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    {validationResult.missing_required_columns.map(col => (
+                      <li key={col} className="text-yellow-900">{col}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {validationResult.type_errors?.length > 0 && (
+                <div className="mt-4 p-3 bg-yellow-100 rounded-md">
+                  <p className="font-semibold">Erreurs de type de données :</p>
+                  <ul className="list-disc list-inside mt-2 space-y-2">
+                    {validationResult.type_errors.slice(0, 5).map((error, idx) => (
+                      <li key={idx} className="text-yellow-900">
+                        <span>
+                          Ligne <span className="font-medium">{error.row}</span>, 
+                          colonne <span className="font-medium">'{error.column}'</span>: {error.error}
+                        </span>
+                        {error.column.toLowerCase().includes('date') && (
+                          <button 
+                            onClick={() => handleDateCorrection(error.column)}
+                            disabled={isProcessing}
+                            className="ml-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs rounded-md transition-colors disabled:bg-blue-300 inline-flex items-center gap-1"
+                          >
+                            {isProcessing ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Correction...
+                              </>
+                            ) : (
+                              'Corriger les dates'
+                            )}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                    {validationResult.type_errors.length > 5 && (
+                      <li className="text-yellow-700 font-medium">...et {validationResult.type_errors.length - 5} autres erreurs.</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="mt-6 flex justify-center">
+            <button 
+              onClick={handleDownload}
+              disabled={!validationResult.temp_file_path || isProcessing}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 transition-colors text-white px-6 py-3 rounded-md disabled:bg-green-300 shadow-sm"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Téléchargement...
+                </>
+              ) : (
+                correctedFilePath ? 'Télécharger le fichier corrigé' : 'Télécharger le fichier validé'
+              )}
+            </button>
+          </div>
+        </motion.div>
+      )}
+      
+      {/* Information supplémentaire */}
+      <div className="mt-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h3 className="text-lg font-medium text-gray-700 mb-2">À propos de G4IT CSV Checker</h3>
+        <p className="text-gray-600">
+          Cet outil vous aide à valider et corriger vos fichiers CSV et XLSX avant de les soumettre à l'outil de calcul G4IT.
+          Il vérifie la présence des colonnes obligatoires et s'assure que les données sont au bon format.
+        </p>
+      </div>
     </div>
   );
 }

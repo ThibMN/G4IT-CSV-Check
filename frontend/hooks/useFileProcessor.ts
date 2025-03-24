@@ -1,19 +1,22 @@
 import { useState } from 'react';
-import { validateFile, fixDates, downloadProcessedFile, cleanupTempFile } from '../services/api';
+import { validateFile, fixDates, downloadExportedFile, cleanupTempFiles } from '../services/api';
 import { readFile } from '../lib/file-parser';
 
 interface ValidationResult {
   is_valid: boolean;
-  missing_required_columns: string[];
-  type_errors: Array<{
-    row: number;
+  missing_required_columns?: string[];
+  type_errors?: Array<{
     column: string;
-    error: string;
+    row?: number;
+    value?: string;
+    critical?: boolean;
+    suggestion?: string;
   }>;
   temp_file_path?: string;
   original_filename?: string;
   file_format?: string;
   general_error?: string;
+  processed_data?: any[];
 }
 
 export const useFileProcessor = () => {
@@ -84,7 +87,9 @@ export const useFileProcessor = () => {
     setError(null);
     
     try {
-      await downloadProcessedFile(filePath);
+      // Extract filename from path
+      const filename = filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+      await downloadExportedFile(filename);
       return true;
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Une erreur est survenue lors du téléchargement du fichier');
@@ -96,7 +101,7 @@ export const useFileProcessor = () => {
   
   const cleanup = async (filePath: string) => {
     try {
-      await cleanupTempFile(filePath);
+      await cleanupTempFiles();  // Changed from cleanupTempFile to cleanupTempFiles
     } catch (err) {
       console.error('Échec de la suppression du fichier temporaire:', err);
     }

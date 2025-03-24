@@ -217,3 +217,34 @@ export const cleanupTempFiles = async (): Promise<{ success: boolean; message: s
     throw new Error('Erreur lors du nettoyage des fichiers temporaires');
   }
 };
+
+// Interface pour les résultats de correction de dates
+interface DateCorrectionResult {
+  success: boolean;
+  message: string;
+  corrected_file_path?: string;
+}
+
+// Fonction pour corriger les formats de date
+export const fixDates = async (
+  filePath: string,
+  dateColumn: string
+): Promise<DateCorrectionResult> => {
+  const formData = new FormData();
+  formData.append('file_path', filePath);
+  formData.append('date_column', dateColumn);
+  
+  try {
+    const response = await api.post('/api/fix-dates', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response && error.response.data) {
+      throw new Error(error.response.data.detail || 'Erreur lors de la correction des dates');
+    }
+    throw new Error('Erreur lors de la correction des dates');
+  }
+};

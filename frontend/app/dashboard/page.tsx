@@ -243,7 +243,6 @@ export default function Dashboard() {
                                 Traiter
                               </Button>
                             )}
-
                             <Button
                               variant="ghost"
                               size="sm"

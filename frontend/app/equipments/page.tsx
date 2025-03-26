@@ -316,8 +316,8 @@ export default function EquipmentManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {equipments.map((equipment) => (
-                        <TableRow key={equipment.id}>
+                      {equipments.map((equipment, index) => (
+                        <TableRow key={equipment.id || index}> {/* Use `index` as a fallback */}
                           <TableCell className="font-medium">{equipment.nom}</TableCell>
                           <TableCell>{equipment.modele}</TableCell>
                           <TableCell>{equipment.quantite}</TableCell>

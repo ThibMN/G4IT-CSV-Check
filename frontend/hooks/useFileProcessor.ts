@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { validateFile, fixDates, downloadProcessedFile, cleanupTempFile } from '../services/api';
 import { readFile } from '../lib/file-parser';
+import { useErrorStore, FileError } from '../store/error-store'; // Ajout de cette ligne
 
 interface ValidationResult {
   is_valid: boolean;
@@ -21,6 +22,7 @@ export const useFileProcessor = () => {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filePreview, setFilePreview] = useState<any[] | null>(null);
+  const errorStore = useErrorStore();
   
   const processFile = async (file: File) => {
     console.log("⬆️ Début du traitement du fichier:", file.name);
@@ -46,6 +48,22 @@ export const useFileProcessor = () => {
       const result = await validateFile(file);
       console.log("📥 Réponse reçue du backend:", result);
       setValidationResult(result);
+      
+      // Si des erreurs sont présentes dans le résultat, les stocker dans le store
+      if (result.type_errors?.length > 0) {
+        // Convertir le format d'erreur du backend au format du store
+        const storeErrors: FileError[] = result.type_errors.map((err: { row: number; column: any; value: any; error: any; }, index: number) => ({
+          id: index + 1,
+          row: err.row,
+          column: err.column,
+          severity: err.row === 0 ? "critical" : "minor", // Assurez-vous que ces valeurs correspondent à celles attendues
+          value: err.value,
+          error: err.error,
+          fixed: false
+        }));
+        
+        errorStore.setErrors(storeErrors);
+      }
       
       return result;
     } catch (err: any) {

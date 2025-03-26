@@ -7,36 +7,33 @@ class CsvHandler:
     Provides methods to read, write, and append data to CSV files 
     with automatic header management.
     """
-    def __init__(self, file):
-        """Initializes the Csv class with a file path.
-
-        Args:
-            file (String): Path to the CSV file to be manipulated.
-        """
-        self.file = file
-
+    def __init__(self, file_path):
+        self.file_path = file_path
+    
     def load_data(self):
-        """Reads data from CSV file.
-
-        Returns:
-            list: List of dictionaries where each dictionary represents a row.
-        """
+        """Charge les données depuis le fichier CSV avec détection automatique du séparateur."""
+        import pandas as pd
+        import logging
+        
+        logging.info(f"Chargement du fichier CSV: {self.file_path}")
+        
         try:
-            with open(self.file, mode='r', newline='', encoding='utf-8') as f:
-                reader = csv_module.DictReader(f)
-                return list(reader)
-        except FileNotFoundError:
-            print(f"Erreur: Le fichier '{self.file}' est introuvable.")
-            return []
-        except PermissionError:
-            print(f"Erreur: Pas d'autorisation pour accéder au fichier '{self.file}'.")
-            return []
-        except UnicodeDecodeError:
-            print(f"Erreur: Problème d'encodage lors de la lecture du fichier '{self.file}'.")
-            return []
+            # Utiliser la détection automatique de séparateur avec le moteur Python
+            df = pd.read_csv(self.file_path, encoding='utf-8', engine='python', sep=None)
+            
+            # Normaliser les noms de colonnes
+            df.columns = [col.strip() for col in df.columns]
+            
+            # Convertir en liste de dictionnaires
+            data = df.to_dict(orient='records')
+            logging.info(f"Données chargées avec succès: {len(data)} lignes, {len(df.columns)} colonnes")
+            return data
+            
         except Exception as e:
-            print(f"Erreur inattendue lors du chargement du fichier '{self.file}': {str(e)}")
-            return []
+            logging.error(f"Erreur lors du chargement du fichier CSV: {str(e)}")
+            import traceback
+            logging.error(traceback.format_exc())
+            raise
         
     def write_data(self, data, header=None):
         """Writes data to CSV file.
@@ -46,7 +43,7 @@ class CsvHandler:
             header (list, optional): Column headers. Defaults to None.
         """
         try:
-            with open(self.file, mode='w', newline='', encoding='utf-8') as f:
+            with open(self.file_path, mode='w', newline='', encoding='utf-8') as f:
                 if header is None:
                     header = data[0].keys() if data else []
                 
@@ -54,11 +51,11 @@ class CsvHandler:
                 writer.writeheader()
                 writer.writerows(data)
         except PermissionError:
-            print(f"Erreur: Pas d'autorisation pour modifier le fichier '{self.file}'.")
+            print(f"Erreur: Pas d'autorisation pour modifier le fichier '{self.file_path}'.")
         except IOError as e:
-            print(f"Erreur d'entrée/sortie lors de l'écriture dans '{self.file}': {str(e)}")
+            print(f"Erreur d'entrée/sortie lors de l'écriture dans '{self.file_path}': {str(e)}")
         except Exception as e:
-            print(f"Erreur inattendue lors de la modification des données dans '{self.file}': {str(e)}")
+            print(f"Erreur inattendue lors de la modification des données dans '{self.file_path}': {str(e)}")
 
     def append_row(self, line):
         """Appends a single line (row) to CSV file.
@@ -67,17 +64,17 @@ class CsvHandler:
             line (dict): Dictionary representing a row to add.
         """
         try:
-            with open(self.file, mode='a', newline='', encoding='utf-8') as f:
+            with open(self.file_path, mode='a', newline='', encoding='utf-8') as f:
                 writer = csv_module.DictWriter(f, fieldnames=line.keys())
                 if f.tell() == 0:  # If file is empty, write header
                     writer.writeheader()
                 writer.writerow(line)
         except PermissionError:
-            print(f"Erreur: Pas d'autorisation pour modifier le fichier '{self.file}'.")
+            print(f"Erreur: Pas d'autorisation pour modifier le fichier '{self.file_path}'.")
         except IOError as e:
-            print(f"Erreur d'entrée/sortie lors de l'ajout de ligne dans '{self.file}': {str(e)}")
+            print(f"Erreur d'entrée/sortie lors de l'ajout de ligne dans '{self.file_path}': {str(e)}")
         except Exception as e:
-            print(f"Erreur inattendue lors de l'ajout de ligne dans '{self.file}': {str(e)}")
+            print(f"Erreur inattendue lors de l'ajout de ligne dans '{self.file_path}': {str(e)}")
 
 
     def validate_dates(self, date_column):
@@ -204,7 +201,7 @@ class CsvHandler:
             if not data:
                 return {
                     "is_valid": False,
-                    "general_error": f"Impossible de charger les données du fichier '{self.file}'"
+                    "general_error": f"Impossible de charger les données du fichier '{self.file_path}'"
                 }
                 
             specs = column_specs if column_specs else G4IT_COLUMN_SPECS
@@ -212,9 +209,9 @@ class CsvHandler:
             
             # Print summary
             if report["is_valid"]:
-                print(f"Validation réussie: Le fichier '{self.file}' respecte les spécifications.")
+                print(f"Validation réussie: Le fichier '{self.file_path}' respecte les spécifications.")
             else:
-                print(f"Validation échouée: Le fichier '{self.file}' contient des erreurs:")
+                print(f"Validation échouée: Le fichier '{self.file_path}' contient des erreurs:")
                 
                 if report.get("missing_required_columns"):
                     print(f"  - Colonnes obligatoires manquantes: {', '.join(report['missing_required_columns'])}")

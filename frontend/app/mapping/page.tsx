@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertCircle, HelpCircle, CheckCircle, ChevronDown } from "lucide-react";
 import { useHeaderMappingStore } from "@/store/header-mapping-store";
 import Navbar from "@/components/layout/navbar";
+import axios from "axios";
+import { useFileStore } from "@/store/file-store"; // Ajoutez cette ligne en haut du fichier
 
 // Définition des types
 interface ExpectedHeader {
@@ -22,54 +24,13 @@ interface DetectedHeader {
   mappedTo: string | null;
 }
 
-// En-têtes attendus avec leurs descriptions
-const expectedHeaders: ExpectedHeader[] = [
-  {
-    key: "nomEquipementPhysique",
-    label: "Nom de l'équipement",
-    required: true,
-    description: "Le nom unique qui identifie l'équipement physique"
-  },
-  {
-    key: "modele",
-    label: "Modèle",
-    required: true,
-    description: "Le modèle exact de l'équipement"
-  },
-  {
-    key: "quantite",
-    label: "Quantité",
-    required: true,
-    description: "Le nombre d'unités de cet équipement"
-  },
-  {
-    key: "dateAchat",
-    label: "Date d'achat",
-    required: false,
-    description: "La date à laquelle l'équipement a été acquis (format JJ/MM/AAAA)"
-  },
-  {
-    key: "statut",
-    label: "Statut",
-    required: false,
-    description: "L'état actuel de l'équipement (ex: en service, en maintenance, hors service)"
-  },
-];
-
-// Exemple de données détectées (dans une vraie app)
-const mockDetectedHeaders: DetectedHeader[] = [
-  { name: "Équipement", index: 0, mappedTo: null },
-  { name: "Type", index: 1, mappedTo: null },
-  { name: "Nombre", index: 2, mappedTo: null },
-  { name: "Date", index: 3, mappedTo: null },
-  { name: "État", index: 4, mappedTo: null },
-];
-
 export default function HeaderMapping() {
-  // États locaux
-  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>(mockDetectedHeaders);
+  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>([]);
+  const [expectedHeaders, setExpectedHeaders] = useState<ExpectedHeader[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [openSelects, setOpenSelects] = useState<number[]>([]);
+  const fileStore = useFileStore(); // Ajoutez cette ligne
 
   // Zustand store pour sauvegarder le mapping
   const { setMapping, mapping } = useHeaderMappingStore();
@@ -85,6 +46,80 @@ export default function HeaderMapping() {
       );
     }
   }, [mapping]);
+
+  // Charger les en-têtes réels via l'API
+  useEffect(() => {
+    // Vérifier si un fichier est sélectionné dans le store
+    const selectedFile = fileStore.selectedFile;
+    if (selectedFile?.temp_file_path) {
+      const fetchHeaders = async () => {
+        try {
+          setIsLoading(true);
+          console.log("Envoi de la requête avec filePath:", selectedFile.temp_file_path);
+          
+          // Utiliser l'API pour récupérer les en-têtes du fichier validé
+          const response = await axios.get('http://localhost:8000/api/get-file-headers', {
+            params: {
+              file_path: selectedFile.temp_file_path
+            }
+          });
+          
+          console.log("Réponse complète:", response);
+          console.log("Réponse data:", response.data);
+          
+          if (response.data && response.data.headers && response.data.headers.length > 0) {
+            console.log("En-têtes trouvés:", response.data.headers);
+            // Convertir les en-têtes détectés au format attendu
+            const headers: DetectedHeader[] = response.data.headers.map((header: string, index: number) => ({
+              name: header,
+              index: index,
+              mappedTo: null
+            }));
+            
+            console.log("En-têtes convertis:", headers);
+            setDetectedHeaders(headers);
+          } else {
+            console.error("Aucun en-tête détecté ou réponse invalide:", response.data);
+          }
+        } catch (error: any) {
+          console.error("Erreur lors de la récupération des en-têtes du fichier:", error);
+          if (error.response) {
+            console.error("Status:", error.response.status);
+            console.error("Detail:", error.response.data);
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchHeaders();
+    }
+  }, [fileStore.selectedFile]);
+
+  // Charger les spécifications de colonnes depuis le backend
+  useEffect(() => {
+    const fetchColumnSpecs = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/api/column-specs');
+        
+        // Convertir les specs en format ExpectedHeader
+        const headers: ExpectedHeader[] = Object.entries(response.data).map(([key, spec]: [string, any]) => ({
+          key,
+          label: key, // Vous pourriez avoir un mapping de noms plus conviviaux
+          required: spec.required,
+          description: `Type attendu: ${spec.type}`
+        }));
+        
+        setExpectedHeaders(headers);
+      } catch (error) {
+        console.error("Erreur lors du chargement des spécifications:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchColumnSpecs();
+  }, []);
 
   // Gérer le changement de mapping
   const handleMappingChange = (headerIndex: number, expectedKey: string | null) => {

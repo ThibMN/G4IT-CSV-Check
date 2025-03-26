@@ -83,3 +83,24 @@ export const cleanupTempFile = async (filePath: string) => {
     throw error;
   }
 };
+
+export const getFileHeaders = async (filePath: string) => {
+  console.log(`🔹 getFileHeaders: Récupération des en-têtes pour ${filePath}`);
+  
+  try {
+    const response = await api.get('/api/get-file-headers', {
+      params: {
+        file_path: filePath
+      }
+    });
+    console.log("🔹 getFileHeaders: En-têtes reçus:", response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error("🔹 getFileHeaders: ERREUR", error);
+    if (error.response) {
+      console.error("  Status:", error.response.status);
+      console.error("  Data:", error.response.data);
+    }
+    throw error;
+  }
+};

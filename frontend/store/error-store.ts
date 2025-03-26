@@ -6,14 +6,13 @@ export type ErrorSeverity = 'critique' | 'mineure';
 
 // Interface pour une erreur
 export interface FileError {
-  id: number;
-  type: string;          // Type d'erreur (ex: "En-tête manquant", "Format incorrect")
-  colonne: string;       // Nom de la colonne concernée
-  gravite: ErrorSeverity;// Niveau de gravité de l'erreur
-  valeur?: string;       // Valeur actuelle (si applicable)
-  suggestion: string;    // Suggestion de correction
-  corrigee: boolean;     // Indique si l'erreur a été corrigée
-  correction?: string;   // Valeur de correction si modifiée par l'utilisateur
+  id: number; // Généré côté frontend pour tracking
+  row: number; // Ajout du numéro de ligne
+  column: string; // Au lieu de "colonne"
+  error: string; // Au lieu de "suggestion"
+  severity: 'critical' | 'minor'; // Déterminé en fonction du type d'erreur
+  value?: string; // Peut être conservé pour l'interface utilisateur
+  fixed: boolean; // Au lieu de "corrigee"
 }
 
 // Interface pour le store
@@ -43,47 +42,47 @@ interface ErrorState {
 const mockErrors: FileError[] = [
   {
     id: 1,
-    type: "En-tête manquant",
-    colonne: "nomEquipementPhysique",
-    gravite: "critique",
-    suggestion: "Ajoutez cette colonne au fichier source.",
-    corrigee: false
+    row: 1,
+    column: "nomEquipementPhysique",
+    severity: "critical",
+    error: "Ajoutez cette colonne au fichier source.",
+    fixed: false
   },
   {
     id: 2,
-    type: "Format incorrect",
-    colonne: "dateAchat",
-    gravite: "mineure",
-    valeur: "03/15/2023",
-    suggestion: "Convertissez au format YYYY-MM-DD : 2023-03-15",
-    corrigee: false
+    row: 2,
+    column: "dateAchat",
+    severity: "minor",
+    value: "03/15/2023",
+    error: "Convertissez au format YYYY-MM-DD : 2023-03-15",
+    fixed: false
   },
   {
     id: 3,
-    type: "Valeur vide",
-    colonne: "statut",
-    gravite: "mineure",
-    valeur: "",
-    suggestion: "Renseignez une valeur par défaut : 'En service'.",
-    corrigee: false
+    row: 3,
+    column: "statut",
+    severity: "minor",
+    value: "",
+    error: "Renseignez une valeur par défaut : 'En service'.",
+    fixed: false
   },
   {
     id: 4,
-    type: "Valeur hors limites",
-    colonne: "quantite",
-    gravite: "critique",
-    valeur: "-5",
-    suggestion: "La quantité doit être un nombre positif.",
-    corrigee: false
+    row: 4,
+    column: "quantite",
+    severity: "critical",
+    value: "-5",
+    error: "La quantité doit être un nombre positif.",
+    fixed: false
   },
   {
     id: 5,
-    type: "Format incorrect",
-    colonne: "type",
-    gravite: "mineure",
-    valeur: "écran",
-    suggestion: "Standardisez le type : 'Écran'",
-    corrigee: false
+    row: 5,
+    column: "type",
+    severity: "minor",
+    value: "écran",
+    error: "Standardisez le type : 'Écran'",
+    fixed: false
   }
 ];
 
@@ -92,7 +91,7 @@ export const useErrorStore = create<ErrorState>()(
   persist(
     (set, get) => ({
       // États initiaux
-      errors: mockErrors, // Pour le développement, utiliser les erreurs mock
+      errors: [], // Était mockErrors
       isLoading: false,
       error: null,
 
@@ -107,7 +106,7 @@ export const useErrorStore = create<ErrorState>()(
 
       markErrorAsCorrected: (id, correction) => set((state) => ({
         errors: state.errors.map(err =>
-          err.id === id ? { ...err, corrigee: true, correction } : err
+          err.id === id ? { ...err, fixed: true, correction } : err
         ),
       })),
 
@@ -124,8 +123,8 @@ export const useErrorStore = create<ErrorState>()(
       // Accesseurs (getters)
       getErrorCount: () => {
         const errors = get().errors;
-        const critique = errors.filter(err => err.gravite === 'critique' && !err.corrigee).length;
-        const mineure = errors.filter(err => err.gravite === 'mineure' && !err.corrigee).length;
+        const critique = errors.filter(err => err.severity === 'critical' && !err.fixed).length;
+        const mineure = errors.filter(err => err.severity === 'minor' && !err.fixed).length;
         return {
           critique,
           mineure,
@@ -134,7 +133,7 @@ export const useErrorStore = create<ErrorState>()(
       },
 
       hasCriticalErrors: () => {
-        return get().errors.some(err => err.gravite === 'critique' && !err.corrigee);
+        return get().errors.some(err => err.severity === 'critical' && !err.fixed);
       },
     }),
     {

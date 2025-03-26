@@ -237,36 +237,40 @@ interface ValidationResult {
 }
 
 export default function FileUploader() {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const { isLoading, validationResult, error, processFile, correctDates, downloadFile, cleanup } = useFileProcessor();
-  const [correctedFilePath, setCorrectedFilePath] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // Renommer isUploading en isProcessing pour cohérence
+  const [correctedFilePath, setCorrectedFilePath] = useState<string | null>(null); // Ajout de cette variable manquante
   
-  // Gestion du changement de fichiers avec FileUpload
-  const handleFilesChange = (files: File[]) => {
-    setSelectedFiles(files);
-    // Reset des résultats antérieurs
-    setCorrectedFilePath(null);
+  const { 
+    processFile, 
+    validationResult, 
+    error, 
+    isLoading, // Récupérer cette variable du hook useFileProcessor
+    correctDates,  // Récupérer cette fonction du hook useFileProcessor
+    downloadFile,  // Récupérer cette fonction du hook useFileProcessor
+    cleanup       // Récupérer cette fonction du hook useFileProcessor
+  } = useFileProcessor();
+  
+  const handleFileChange = (files: File[]) => {
+    if (files && files.length > 0) {
+      setSelectedFile(files[0]);
+      // Réinitialiser les états lors du changement de fichier
+      setCorrectedFilePath(null);
+    }
   };
   
-  // Traitement du fichier
   const handleUpload = async () => {
-    if (!selectedFiles.length) return;
+    if (!selectedFile) return;
     
     setIsProcessing(true);
     try {
-      console.log("Envoi du fichier au backend...");
-      const result = await processFile(selectedFiles[0]);
-      console.log("Résultat de la validation backend:", result);
-      setCorrectedFilePath(null);
-    } catch (err) {
-      console.error("Erreur:", err);
+      await processFile(selectedFile);
     } finally {
       setIsProcessing(false);
     }
   };
   
-  // Correction des dates
+  // Ajouter cette fonction manquante
   const handleDateCorrection = async (column: string) => {
     if (!validationResult?.temp_file_path) return;
     
@@ -276,12 +280,14 @@ export default function FileUploader() {
       if (result?.success && result.corrected_file_path) {
         setCorrectedFilePath(result.corrected_file_path);
       }
+    } catch (err) {
+      console.error("Erreur lors de la correction des dates:", err);
     } finally {
       setIsProcessing(false);
     }
   };
   
-  // Téléchargement du fichier traité
+  // Ajouter cette fonction manquante
   const handleDownload = async () => {
     const fileToDownload = correctedFilePath || validationResult?.temp_file_path;
     if (!fileToDownload) return;
@@ -290,13 +296,15 @@ export default function FileUploader() {
     try {
       await downloadFile(fileToDownload);
       
-      // Nettoyage des fichiers temporaires après téléchargement
+      // Nettoyer les fichiers temporaires après téléchargement
       if (correctedFilePath) {
         await cleanup(correctedFilePath);
       }
       if (validationResult?.temp_file_path) {
         await cleanup(validationResult.temp_file_path);
       }
+    } catch (err) {
+      console.error("Erreur lors du téléchargement:", err);
     } finally {
       setIsProcessing(false);
     }
@@ -308,9 +316,9 @@ export default function FileUploader() {
       
       {/* Upload avec le composant FileUpload */}
       <div className="mb-6">
-        <FileUpload onChange={handleFilesChange} />
+        <FileUpload onChange={handleFileChange} />
         
-        {selectedFiles.length > 0 && (
+        {selectedFile && (
           <div className="mt-4 flex justify-center">
             <button 
               onClick={handleUpload} 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import axios from 'axios';
 
 // Types pour les équipements
 export interface EquipmentType {
@@ -69,6 +70,9 @@ interface EquipmentState {
   updateConsolidatedEquipment: (index: number, updatedEquipment: ConsolidatedEquipment) => void;
   consolidateEquipments: () => void;
   setIsConsolidationModified: (isModified: boolean) => void;
+
+  // Action pour charger les équipements depuis un fichier
+  loadEquipmentsFromFile: (filePath: string) => Promise<void>;
 }
 
 // Création du store avec persistance
@@ -179,6 +183,29 @@ export const useEquipmentStore = create<EquipmentState>()(
         }
       },
       setIsConsolidationModified: (isModified) => set({ isConsolidationModified: isModified }),
+
+      // Action pour charger les équipements depuis un fichier
+      loadEquipmentsFromFile: async (filePath: string) => {
+        set({ isLoading: true });
+        
+        try {
+          // Appeler une API pour charger les équipements depuis le fichier validé
+          const response = await axios.post('http://localhost:8000/api/load-equipment', {
+            file_path: filePath
+          });
+          
+          set({ 
+            equipments: response.data.equipments,
+            isLoading: false 
+          });
+        } catch (error) {
+          console.error("Erreur lors du chargement des équipements:", error);
+          set({ 
+            error: "Erreur lors du chargement des équipements", 
+            isLoading: false 
+          });
+        }
+      },
     }),
     {
       name: 'equipment-storage',

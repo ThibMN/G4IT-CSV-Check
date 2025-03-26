@@ -44,3 +44,4 @@ node_modules
 /backend/models/__pycache__/
 /backend/tests/
 /backend/.pytest_cache/
+/backend/venv/

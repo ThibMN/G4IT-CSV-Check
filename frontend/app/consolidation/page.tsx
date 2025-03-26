@@ -10,17 +10,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useEquipmentStore, ConsolidatedEquipment, Equipment } from "@/store/equipment-store";
 import Navbar from "@/components/layout/navbar";
 
-// Données d'exemple pour la démo
-const EXAMPLE_EQUIPMENTS: Equipment[] = [
-  { id: 1, nom: "PC Dell 1", modele: "Dell X280", quantite: 2, statut: "Actif" },
-  { id: 2, nom: "PC Dell 2", modele: "Dell X280", quantite: 3, statut: "Actif" },
-  { id: 3, nom: "Écran HP", modele: "HP Z27", quantite: 1, statut: "Actif" },
-  { id: 4, nom: "Serveur 1", modele: "Dell PowerEdge", quantite: 1, statut: "Actif" },
-  { id: 5, nom: "Serveur 2", modele: "Dell PowerEdge", quantite: 2, statut: "Inactif" },
-  { id: 6, nom: "MacBook Pro 1", modele: "MacBook Pro", quantite: 2, statut: "Actif" },
-  { id: 7, nom: "MacBook Pro 2", modele: "MacBook Pro", quantite: 1, statut: "Actif" },
-];
-
 // Message d'erreur
 const ErrorMessage = ({ message, onRetry }: { message: string; onRetry: () => void }) => {
   return (
@@ -150,13 +139,6 @@ export default function ConsolidationPage() {
     consolidateEquipments,
     updateConsolidatedEquipment,
   } = useEquipmentStore();
-
-  // Charger des données d'exemple si aucun équipement n'est disponible
-  useEffect(() => {
-    if (equipments.length === 0) {
-      setEquipments(EXAMPLE_EQUIPMENTS);
-    }
-  }, [equipments.length, setEquipments]);
 
   // Effectuer la consolidation initiale des équipements
   useEffect(() => {

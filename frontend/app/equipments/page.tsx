@@ -222,62 +222,6 @@ export default function EquipmentManagement() {
     setCurrentPage(page);
   };
 
-  // Données mockées pour l'exemple
-  const mockData = () => {
-    // Simuler les types d'équipement
-    const types: EquipmentType[] = [
-      { id: 1, nom: "Écran" },
-      { id: 2, nom: "Ordinateur Portable" },
-      { id: 3, nom: "Serveur" }
-    ];
-    setEquipmentTypes(types);
-
-    // Simuler les modèles selon le type sélectionné
-    if (selectedType) {
-      let models: EquipmentModel[] = [];
-      if (selectedType.id === 1) {
-        models = [
-          { id: 101, nom: "Dell P2720DC", type: "Écran" },
-          { id: 102, nom: "HP Z27", type: "Écran" }
-        ];
-      } else if (selectedType.id === 2) {
-        models = [
-          { id: 201, nom: "MacBook Pro", type: "Ordinateur Portable" },
-          { id: 202, nom: "Dell XPS 13", type: "Ordinateur Portable" }
-        ];
-      } else if (selectedType.id === 3) {
-        models = [
-          { id: 301, nom: "Dell PowerEdge", type: "Serveur" },
-          { id: 302, nom: "HP ProLiant", type: "Serveur" }
-        ];
-      }
-      setEquipmentModels(models);
-    }
-
-    // Simuler les équipements
-    const equipments: Equipment[] = [];
-    for (let i = 1; i <= 15; i++) {
-      equipments.push({
-        id: i,
-        nom: `Équipement ${i}`,
-        modele: selectedModel ? selectedModel.nom : "Modèle Standard",
-        quantite: Math.floor(Math.random() * 10) + 1,
-        statut: Math.random() > 0.3 ? "Actif" : "Inactif"
-      });
-    }
-
-    // Ne prendre que les éléments de la page courante
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    setEquipments(equipments.slice(startIndex, endIndex));
-    setTotalPages(Math.ceil(equipments.length / itemsPerPage));
-  };
-
-  // Utiliser les données mockées au lieu des appels API
-  useEffect(() => {
-    mockData();
-  }, [selectedType, selectedModel, currentPage]);
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-8">

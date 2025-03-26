@@ -33,7 +33,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   // Accès aux stores Zustand
-  const { setEquipments } = useEquipmentStore();
+  const { setEquipments, setImportedFile } = useEquipmentStore();
   const { setErrors, hasCriticalErrors } = useErrorStore();
 
   // États locaux
@@ -50,9 +50,8 @@ export default function Dashboard() {
 
   // Fonction pour gérer le changement de fichiers
   const handleFileChange = (files: File[]) => {
-    // Remplacer complètement les fichiers au lieu de les ajouter
     setUploadedFiles(files);
-    // Réinitialiser les états
+    setImportedFile(files[0] || null); // garde le fiché importé dans le store
     setProcessingFiles([]);
     setProcessedFiles([]);
     setErrorMessage(null);

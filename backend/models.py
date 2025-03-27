@@ -10,50 +10,150 @@ logger = logging.getLogger(__name__)
 
 # Spécifications des colonnes G4IT
 G4IT_COLUMN_SPECS = {
-    "equipmentType": {
-        "required": True,
-        "description": "Type d'équipement",
-        "examples": ["Laptop", "Desktop", "Server"]
+    # Informations d'identification de l'équipement
+    'nomEquipementPhysique': {
+        'required': True,
+        'type': 'string',
+        'example': 'Serveur Dell PowerEdge R740',
+        'description': "Nom ou référence de l'équipement physique"
     },
-    "manufacturer": {
-        "required": True,
-        "description": "Fabricant de l'équipement",
-        "examples": ["Dell", "HP", "Lenovo"]
+    'modele': {
+        'required': True,
+        'type': 'string',
+        'example': 'Serveur-Milieu-de-Gamme',
+        'description': "Modèle ou catégorie de l'équipement"
     },
-    "model": {
-        "required": True,
-        "description": "Modèle spécifique de l'équipement",
-        "examples": ["XPS 13", "EliteBook 840", "ThinkPad T14"]
+    'quantite': {
+        'required': True,
+        'type': 'integer',
+        'example': '25000',
+        'description': "Nombre d'unités de cet équipement"
     },
-    "quantity": {
-        "required": True,
-        "description": "Nombre d'unités de cet équipement",
-        "examples": ["1", "5", "10"]
+    'nomCourtDatacenter': {
+        'required': True,
+        'type': 'string',
+        'example': 'DC-PARIS',
+        'description': "Identifiant du datacenter hébergeant l'équipement"
     },
-    "cpu": {
-        "required": False,
-        "description": "Processeur de l'équipement",
-        "examples": ["Intel i5", "AMD Ryzen 7", "Apple M1"]
+    
+    # Informations temporelles
+    'dateAchat': {
+        'required': False,
+        'type': 'date',
+        'format': 'YYYY-MM-DD',
+        'example': '2015-12-25',
+        'description': "Date d'acquisition de l'équipement"
     },
-    "ram": {
-        "required": False,
-        "description": "Mémoire vive en GB",
-        "examples": ["8", "16", "32"]
+    'dateRetrait': {
+        'required': False,
+        'type': 'date',
+        'format': 'YYYY-MM-DD',
+        'example': '2018-12-25',
+        'description': "Date de mise hors service prévue ou effective"
     },
-    "storage": {
-        "required": False,
-        "description": "Stockage en GB",
-        "examples": ["256", "512", "1000"]
+    'dureeUsageInterne': {
+        'required': False,
+        'type': 'integer',
+        'example': '36',
+        'description': "Durée d'utilisation interne en mois"
     },
-    "purchaseYear": {
-        "required": False,
-        "description": "Année d'achat",
-        "examples": ["2020", "2021", "2022"]
+    'dureeUsageAmont': {
+        'required': False,
+        'type': 'integer',
+        'example': '12',
+        'description': "Durée d'utilisation en amont en mois"
     },
-    "eol": {
-        "required": False,
-        "description": "Fin de vie prévue (année)",
-        "examples": ["2025", "2026", "2027"]
+    'dureeUsageAval': {
+        'required': False,
+        'type': 'integer',
+        'example': '24',
+        'description': "Durée d'utilisation en aval en mois"
+    },
+    
+    # Caractéristiques de l'équipement
+    'type': {
+        'required': True,
+        'type': 'string',
+        'example': 'Ecran',
+        'description': "Type d'équipement (Serveur, Ecran, PC, etc.)"
+    },
+    'statut': {
+        'required': True,
+        'type': 'string',
+        'example': 'Active',
+        'description': "État actuel de l'équipement (Active, Inactive, En maintenance, etc.)"
+    },
+    'paysDUtilisation': {
+        'required': True,
+        'type': 'string',
+        'example': 'France',
+        'description': "Pays où l'équipement est utilisé"
+    },
+    
+    # Informations de consommation et d'utilisation
+    'consoElecAnnuelle': {
+        'required': False,
+        'type': 'number',
+        'example': '2450.75',
+        'description': "Consommation électrique annuelle en kWh"
+    },
+    'utilisateur': {
+        'required': False,
+        'type': 'string',
+        'example': 'Service IT',
+        'description': "Service ou personne utilisant l'équipement"
+    },
+    'nomSourceDonnee': {
+        'required': False,
+        'type': 'string',
+        'example': 'Inventaire 2023',
+        'description': "Source des données pour cet équipement"
+    },
+    'nomEntite': {
+        'required': False,
+        'type': 'string',
+        'example': 'Département Réseau',
+        'description': "Entité responsable de l'équipement"
+    },
+    
+    # Caractéristiques techniques
+    'nbCoeur': {
+        'required': False,
+        'type': 'integer',
+        'example': '16',
+        'description': "Nombre de cœurs de processeur (pour serveurs/PC)"
+    },
+    'nbJourUtiliseAn': {
+        'required': False,
+        'type': 'integer',
+        'example': '252',
+        'description': "Nombre de jours d'utilisation par an"
+    },
+    'goTelecharge': {
+        'required': False,
+        'type': 'integer',
+        'example': '5000',
+        'description': "Volume de données téléchargées en Go"
+    },
+    
+    # Modalités d'utilisation
+    'modeUtilisation': {
+        'required': False,
+        'type': 'string',
+        'example': 'Production',
+        'description': "Mode d'utilisation (Production, Test, Développement, etc.)"
+    },
+    'tauxUtilisation': {
+        'required': False,
+        'type': 'number',
+        'example': '0.75',
+        'description': "Taux d'utilisation moyen (entre 0 et 1)"
+    },
+    'qualite': {
+        'required': False,
+        'type': 'string',
+        'example': 'Haute',
+        'description': "Niveau de qualité ou de performance (Haute, Moyenne, Standard, etc.)"
     }
 }
 

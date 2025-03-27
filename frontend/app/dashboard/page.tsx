@@ -396,7 +396,7 @@ export default function Dashboard() {
                         <h3 className="font-medium text-sm mb-1">En-têtes requis:</h3>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <code className="text-xs text-gray-800 whitespace-pre-wrap">
-                            equipmentType, manufacturer, model, quantity
+                            nomEquipementPhysique, modele, quantite, nomCourtDatacenter, type, statut, paysDUtilisation
                           </code>
                         </div>
                       </div>
@@ -404,7 +404,7 @@ export default function Dashboard() {
                         <h3 className="font-medium text-sm mb-1">En-têtes optionnels:</h3>
                         <div className="bg-gray-50 p-3 rounded-md">
                           <code className="text-xs text-gray-800 whitespace-pre-wrap">
-                            cpu, ram, storage, purchaseYear, eol
+                            dateAchat, dateRetrait, dureeUsageInterne, dureeUsageAmont, dureeUsageAval, consoElecAnnuelle, utilisateur, nomSourceDonnee, nomEntite, nbCoeur, nbJourUtiliseAn, goTelecharge, modeUtilisation, tauxUtilisation, qualite
                           </code>
                         </div>
                       </div>

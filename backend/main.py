@@ -65,8 +65,42 @@ async def validate_file(file: UploadFile = File(...)):
         file_extension = os.path.splitext(file.filename)[1].lower()
 
         detected_columns = []
-        required_columns = ["equipmentType", "manufacturer", "model", "quantity"]
-        optional_columns = ["cpu", "ram", "storage", "purchaseYear", "eol"]
+        # Colonnes obligatoires dans les fichiers CSV G4IT
+        required_columns = [
+            'nomEquipementPhysique',  # Nom ou référence de l'équipement
+            'modele',                 # Modèle ou catégorie de l'équipement
+            'quantite',               # Nombre d'unités
+            'nomCourtDatacenter',     # Identifiant du datacenter
+            'type',                   # Type d'équipement (Ecran, Serveur, etc.)
+            'statut',                 # État de l'équipement (Active, Inactive, etc.)
+            'paysDUtilisation'        # Pays où l'équipement est utilisé
+        ]
+
+        # Colonnes optionnelles dans les fichiers CSV G4IT
+        optional_columns = [
+            # Informations temporelles
+            'dateAchat',           # Date d'acquisition (format YYYY-MM-DD)
+            'dateRetrait',         # Date de mise hors service (format YYYY-MM-DD)
+            'dureeUsageInterne',   # Durée d'utilisation interne en mois
+            'dureeUsageAmont',     # Durée d'utilisation en amont en mois
+            'dureeUsageAval',      # Durée d'utilisation en aval en mois
+            
+            # Informations d'utilisation
+            'consoElecAnnuelle',   # Consommation électrique annuelle en kWh
+            'utilisateur',         # Service ou personne utilisant l'équipement
+            'nomSourceDonnee',     # Source des données pour cet équipement
+            'nomEntite',           # Entité responsable de l'équipement
+            
+            # Caractéristiques techniques
+            'nbCoeur',             # Nombre de cœurs de processeur
+            'nbJourUtiliseAn',     # Nombre de jours d'utilisation par an
+            'goTelecharge',        # Volume de données téléchargées en Go
+            
+            # Modalités d'utilisation
+            'modeUtilisation',     # Mode d'utilisation (Production, Test, etc.)
+            'tauxUtilisation',     # Taux d'utilisation moyen (entre 0 et 1)
+            'qualite'              # Niveau de qualité ou performance
+        ]
         missing_required_columns = []
         type_errors = []
 

@@ -47,3 +47,4 @@
 /backend/venv/
 
 tests/
+node_modules

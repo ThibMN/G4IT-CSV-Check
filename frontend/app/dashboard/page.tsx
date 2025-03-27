@@ -71,6 +71,12 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Vérifier si nous sommes côté client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Fonctions de navigation
   const navigateToPage = (path: string) => {
@@ -278,6 +284,17 @@ export default function Dashboard() {
     clearErrors();
     setValidationReport(null);
   };
+
+  // Conditionnez le rendu pour éviter les incohérences d'hydratation
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="p-8 rounded-lg text-center">
+          <p>Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

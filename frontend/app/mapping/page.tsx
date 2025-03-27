@@ -268,25 +268,161 @@ export default function HeaderMapping() {
   const suggestMappings = (headers: DetectedHeader[]) => {
     const newHeaders = [...headers];
     
-    newHeaders.forEach(header => {
-      // Normaliser le nom de la colonne (minuscules, sans espaces)
-      const normalizedName = header.name.toLowerCase().replace(/\s+/g, '');
+    // Fonction pour calculer la distance de Levenshtein (similarité de chaînes)
+    const levenshteinDistance = (a: string, b: string): number => {
+      if (a.length === 0) return b.length;
+      if (b.length === 0) return a.length;
+  
+      const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+  
+      for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+      for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j] + 1,      // suppression
+            matrix[i][j - 1] + 1,      // insertion
+            matrix[i - 1][j - 1] + cost // substitution
+          );
+        }
+      }
+  
+      return matrix[a.length][b.length];
+    };
+  
+    // Fonction pour calculer la similarité entre deux chaînes (0 à 1)
+    const stringSimilarity = (a: string, b: string): number => {
+      const maxLength = Math.max(a.length, b.length);
+      if (maxLength === 0) return 1.0; // Les deux chaînes sont vides
       
-      // Chercher une correspondance dans les en-têtes attendus
+      const distance = levenshteinDistance(a, b);
+      return 1 - distance / maxLength;
+    };
+  
+    // Pour chaque en-tête détecté, trouver le meilleur match
+    newHeaders.forEach(header => {
+      // Normaliser le nom de la colonne (minuscules, sans espaces, sans accents)
+      const normalizedName = header.name
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      let bestMatch: { key: string; similarity: number } | null = null;
+      
+      // Chercher la meilleure correspondance dans les en-têtes attendus
       for (const expected of expectedHeaders) {
-        const normalizedKey = expected.key.toLowerCase();
-        const normalizedLabel = expected.label.toLowerCase().replace(/\s+/g, '');
+        const normalizedKey = expected.key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
         
-        if (normalizedName === normalizedKey || 
-            normalizedName === normalizedLabel ||
-            normalizedName.includes(normalizedKey)) {
-          header.mappedTo = expected.key;
+        const normalizedLabel = expected.label
+          .toLowerCase()
+          .replace(/\s+/g, '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        
+        // Vérifier d'abord les correspondances exactes (priorité maximale)
+        if (normalizedName === normalizedKey || normalizedName === normalizedLabel) {
+          bestMatch = { key: expected.key, similarity: 1.0 };
           break;
         }
+  
+        // Vérifier si la colonne contient la clé ou le label attendu
+        if (normalizedName.includes(normalizedKey) || normalizedName.includes(normalizedLabel)) {
+          const similarity = Math.max(
+            normalizedKey.length / normalizedName.length,
+            normalizedLabel.length / normalizedName.length
+          );
+          
+          if (!bestMatch || similarity > bestMatch.similarity) {
+            bestMatch = { key: expected.key, similarity: similarity };
+          }
+        } 
+        // Calculer la similarité de chaîne
+        else {
+          const keySimilarity = stringSimilarity(normalizedName, normalizedKey);
+          const labelSimilarity = stringSimilarity(normalizedName, normalizedLabel);
+          const maxSimilarity = Math.max(keySimilarity, labelSimilarity);
+          
+          // Ne considérer que les similarités au-dessus d'un certain seuil
+          if (maxSimilarity > 0.7 && (!bestMatch || maxSimilarity > bestMatch.similarity)) {
+            bestMatch = { key: expected.key, similarity: maxSimilarity };
+          }
+        }
+      }
+      
+      // Appliquer le meilleur match trouvé
+      if (bestMatch) {
+        header.mappedTo = bestMatch.key;
       }
     });
     
     setDetectedHeaders(newHeaders);
+  
+    // Vérifier s'il reste des champs obligatoires non mappés et essayer de les mapper
+    const mappedKeys = newHeaders
+      .filter(h => h.mappedTo)
+      .map(h => h.mappedTo);
+    
+    const unmappedRequiredKeys = expectedHeaders
+      .filter(h => h.required && !mappedKeys.includes(h.key))
+      .map(h => h.key);
+  
+    // S'il reste des champs obligatoires non mappés, essayer de les mapper
+    // aux en-têtes détectés qui ne sont pas encore mappés
+    if (unmappedRequiredKeys.length > 0) {
+      const unmappedHeaders = newHeaders.filter(h => !h.mappedTo);
+      
+      unmappedRequiredKeys.forEach(requiredKey => {
+        if (unmappedHeaders.length > 0) {
+          // Trouver le meilleur match pour ce champ obligatoire parmi les en-têtes non mappés
+          const requiredField = expectedHeaders.find(h => h.key === requiredKey);
+          if (!requiredField) return;
+          
+          const normalizedRequired = requiredField.label
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+          
+          let bestHeaderIndex = -1;
+          let bestSimilarity = 0;
+          
+          unmappedHeaders.forEach((unmappedHeader, idx) => {
+            const normalizedName = unmappedHeader.name
+              .toLowerCase()
+              .replace(/\s+/g, '')
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '');
+            
+            const similarity = stringSimilarity(normalizedName, normalizedRequired);
+            
+            if (similarity > bestSimilarity) {
+              bestSimilarity = similarity;
+              bestHeaderIndex = idx;
+            }
+          });
+          
+          // S'il y a un match acceptable, l'appliquer
+          if (bestSimilarity > 0.5 && bestHeaderIndex >= 0) {
+            const headerIndex = unmappedHeaders[bestHeaderIndex].index;
+            
+            // Mettre à jour l'en-tête avec le mapping
+            newHeaders[headerIndex].mappedTo = requiredKey;
+            
+            // Retirer cet en-tête de la liste des non mappés
+            unmappedHeaders.splice(bestHeaderIndex, 1);
+          }
+        }
+      });
+      
+      // Mettre à jour l'état avec les nouveaux mappings
+      setDetectedHeaders([...newHeaders]);
+    }
   };
 
   // Gérer le changement de mapping

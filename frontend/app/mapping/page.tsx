@@ -56,18 +56,9 @@ const expectedHeaders: ExpectedHeader[] = [
   },
 ];
 
-// Exemple de données détectées (dans une vraie app)
-const mockDetectedHeaders: DetectedHeader[] = [
-  { name: "Équipement", index: 0, mappedTo: null },
-  { name: "Type", index: 1, mappedTo: null },
-  { name: "Nombre", index: 2, mappedTo: null },
-  { name: "Date", index: 3, mappedTo: null },
-  { name: "État", index: 4, mappedTo: null },
-];
-
 export default function HeaderMapping() {
   // États locaux
-  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>(mockDetectedHeaders);
+  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [openSelects, setOpenSelects] = useState<number[]>([]);
 

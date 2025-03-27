@@ -54,66 +54,14 @@ export default function ExportPage() {
 
       // Simuler un appel API avec des données de test
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setConsolidatedEquipments(getMockConsolidatedEquipments());
-      setExportHistory(getMockExportHistory());
+      setConsolidatedEquipments([]);
+      setExportHistory([]);
     } catch (err) {
       console.error('Erreur lors du chargement des équipements consolidés:', err);
       setError('Impossible de charger les équipements consolidés. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Fonction pour obtenir des données de test
-  const getMockConsolidatedEquipments = (): ConsolidatedEquipment[] => {
-    return [
-      {
-        id: 'consolidated-1',
-        equipmentType: 'Laptop',
-        manufacturer: 'Dell',
-        model: 'XPS 13',
-        quantity: 5,
-        cpu: 'Intel i7',
-        ram: '16GB',
-        storage: '512GB',
-        purchaseYear: '2022',
-        eol: '2027',
-        originalIds: ['eq-1', 'eq-2', 'eq-3']
-      },
-      {
-        id: 'consolidated-2',
-        equipmentType: 'Desktop',
-        manufacturer: 'HP',
-        model: 'EliteDesk',
-        quantity: 3,
-        cpu: 'Intel i5',
-        ram: '8GB',
-        storage: '1TB',
-        purchaseYear: '2021',
-        eol: '2026',
-        originalIds: ['eq-4', 'eq-5']
-      }
-    ];
-  };
-
-  // Fonction pour obtenir un historique d'export de test
-  const getMockExportHistory = (): ExportHistory[] => {
-    return [
-      {
-        id: 'exp-1',
-        filename: 'export-20230601.csv',
-        dateExported: '2023-06-01T10:30:00Z',
-        format: 'csv',
-        equipmentCount: 8
-      },
-      {
-        id: 'exp-2',
-        filename: 'export-20230715.xlsx',
-        dateExported: '2023-07-15T14:45:00Z',
-        format: 'xlsx',
-        equipmentCount: 12
-      }
-    ];
   };
 
   // Fonction pour exporter les équipements consolidés

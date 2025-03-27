@@ -106,7 +106,7 @@ export const useErrorStore = create<ErrorState>()(
   persist(
     (set, get) => ({
       // États initiaux
-      errors: mockErrors, // Pour le développement, utiliser les erreurs mock
+      errors: , // Pour le développement, utiliser les erreurs mock
       isLoading: false,
       error: null,
 

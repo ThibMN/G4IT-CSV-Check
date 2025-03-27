@@ -44,11 +44,9 @@ export default function EquipmentPage() {
       // Simuler un appel API avec des données de test
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Données de test
-      const mockData = getMockEquipments();
 
       // Filtrer les données
-      let filteredData = [...mockData];
+      let filteredData = [...];
 
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
@@ -80,22 +78,6 @@ export default function EquipmentPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Fonction pour obtenir des données de test
-  const getMockEquipments = (): Equipment[] => {
-    return Array(50).fill(null).map((_, index) => ({
-      id: `eq-${index + 1}`,
-      equipmentType: ['Laptop', 'Desktop', 'Server', 'Monitor', 'Printer'][Math.floor(Math.random() * 5)],
-      manufacturer: ['Dell', 'HP', 'Lenovo', 'Apple', 'ASUS'][Math.floor(Math.random() * 5)],
-      model: `Model-${index + 1}`,
-      quantity: Math.floor(Math.random() * 10) + 1,
-      cpu: Math.random() > 0.3 ? ['Intel i5', 'Intel i7', 'AMD Ryzen 5', 'AMD Ryzen 7'][Math.floor(Math.random() * 4)] : undefined,
-      ram: Math.random() > 0.3 ? ['8GB', '16GB', '32GB'][Math.floor(Math.random() * 3)] : undefined,
-      storage: Math.random() > 0.3 ? ['256GB', '512GB', '1TB'][Math.floor(Math.random() * 3)] : undefined,
-      purchaseYear: Math.random() > 0.3 ? ['2020', '2021', '2022', '2023'][Math.floor(Math.random() * 4)] : undefined,
-      eol: Math.random() > 0.3 ? ['2025', '2026', '2027', '2028'][Math.floor(Math.random() * 4)] : undefined,
-    }));
   };
 
   // Fonction pour changer de page

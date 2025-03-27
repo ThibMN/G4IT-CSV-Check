@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import axios from 'axios';
 import Navbar from "@/components/layout/navbar";
 import { useRouter } from "next/navigation";
+import { useFileStore } from "@/store/file-store";
 
 // Définition des types
 interface ExpectedHeader {
@@ -178,12 +179,33 @@ export default function HeaderMapping() {
   const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [openSelects, setOpenSelects] = useState<number[]>([]);
-  const [isFileUploaded, setIsFileUploaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isFileUploaded, setIsFileUploaded] = useState(false); // Ajout de cette ligne
 
+  // Récupérer le fichier et les colonnes depuis le store global
+  const { currentFile, detectedColumns } = useFileStore();
+  
   // Zustand store pour sauvegarder le mapping
   const { setMapping, mapping } = useHeaderMappingStore();
+
+  // Vérifier si un fichier est déjà disponible dans le store global
+  useEffect(() => {
+    if (currentFile && detectedColumns.length > 0) {
+      // Si un fichier existe déjà, utiliser les colonnes déjà détectées
+      const headers: DetectedHeader[] = detectedColumns.map((column: string, index: number) => ({
+        name: column,
+        index: index,
+        mappedTo: null // Au départ, aucune colonne n'est mappée
+      }));
+      
+      setDetectedHeaders(headers);
+      setIsFileUploaded(true);
+      
+      // Suggestion automatique basée sur la similarité des noms
+      suggestMappings(headers);
+    }
+  }, [currentFile, detectedColumns]);
 
   // Effet pour charger le mapping existant
   useEffect(() => {
@@ -328,6 +350,9 @@ export default function HeaderMapping() {
     );
   };
 
+  // Modifier la condition pour tenir compte du store global
+  const isFileAvailable = isFileUploaded || (currentFile !== null && detectedColumns.length > 0);
+
   return (
     <div className="min-h-screen">
       <div className="container mx-auto py-8">
@@ -395,7 +420,7 @@ export default function HeaderMapping() {
           </div>
         )}
 
-        {!isFileUploaded ? (
+        {!isFileAvailable ? (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Importation de fichier</CardTitle>

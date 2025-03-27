@@ -31,6 +31,7 @@ import { processFileData, FileData } from "@/lib/validation-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import axios from 'axios';
+import { useFileStore } from "@/store/file-store";
 
 interface ErrorItem {
   type: 'missing_column' | 'invalid_format' | 'connection_error';
@@ -62,6 +63,7 @@ export default function Dashboard() {
   // Accès aux stores Zustand
   const { setEquipments } = useEquipmentStore();
   const { setErrors, hasCriticalErrors, addErrors, clearErrors } = useErrorStore();
+  const { setCurrentFile, setDetectedColumns } = useFileStore();
 
   // États locaux
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -169,10 +171,12 @@ export default function Dashboard() {
       setValidationReport(null);
 
       if (files.length === 0) {
+        setCurrentFile(null); // Mettre à jour le store global
         return;
       }
 
       const file = files[0]; // On prend le premier fichier
+      setCurrentFile(file); // Stocker le fichier dans le store global
 
       // Créer un FormData pour envoyer le fichier
       const formData = new FormData();
@@ -187,6 +191,11 @@ export default function Dashboard() {
         });
 
         console.log('Réponse backend:', response.data);
+        
+        // Stocker les colonnes détectées dans le store global
+        if (response.data.detected_columns) {
+          setDetectedColumns(response.data.detected_columns);
+        }
 
         // Transformer la réponse pour correspondre au format attendu
         const report: ValidationReport = {

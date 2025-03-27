@@ -563,3 +563,40 @@ async def export_equipments(data: dict):
     except Exception as e:
         logging.error(f"Erreur lors de l'export des équipements: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/detect-headers")
+async def detect_headers(file: UploadFile = File(...)):
+    """Détecte les en-têtes d'un fichier CSV ou Excel sans le valider complètement."""
+    try:
+        # Sauvegarder temporairement le fichier
+        temp_file_path = os.path.join(TEMP_DIR, file.filename)
+        with open(temp_file_path, "wb") as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            await file.seek(0)  # Réinitialiser le curseur du fichier
+
+        # Déterminer le type de fichier et extraire les en-têtes
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        
+        if file_extension == ".csv":
+            handler = CsvHandler(temp_file_path)
+        elif file_extension in [".xlsx", ".xls"]:
+            handler = XlsxHandler(temp_file_path)
+        else:
+            raise HTTPException(status_code=400, detail="Format de fichier non supporté")
+        
+        # Lire seulement les en-têtes du fichier
+        detected_columns = handler.get_headers()
+        
+        # Nettoyer le fichier temporaire
+        os.remove(temp_file_path)
+        
+        return {
+            "detected_columns": detected_columns
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la détection des en-têtes: {str(e)}")
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la détection des en-têtes: {str(e)}")

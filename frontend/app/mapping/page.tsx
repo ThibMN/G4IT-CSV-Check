@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, HelpCircle, CheckCircle, ChevronDown } from "lucide-react";
+import { AlertCircle, HelpCircle, CheckCircle, ChevronDown, FileUp } from "lucide-react";
 import { useHeaderMappingStore } from "@/store/header-mapping-store";
+import { FileUpload } from "@/components/ui/file-upload";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import axios from 'axios';
 import Navbar from "@/components/layout/navbar";
+import { useRouter } from "next/navigation";
 
 // Définition des types
 interface ExpectedHeader {
@@ -167,20 +171,16 @@ const expectedHeaders: ExpectedHeader[] = [
   }
 ];
 
-// Exemple de données détectées (dans une vraie app)
-const mockDetectedHeaders: DetectedHeader[] = [
-  { name: "Équipement", index: 0, mappedTo: null },
-  { name: "Type", index: 1, mappedTo: null },
-  { name: "Nombre", index: 2, mappedTo: null },
-  { name: "Date", index: 3, mappedTo: null },
-  { name: "État", index: 4, mappedTo: null },
-];
-
 export default function HeaderMapping() {
+  const router = useRouter();
+  
   // États locaux
-  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>(mockDetectedHeaders);
+  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [openSelects, setOpenSelects] = useState<number[]>([]);
+  const [isFileUploaded, setIsFileUploaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Zustand store pour sauvegarder le mapping
   const { setMapping, mapping } = useHeaderMappingStore();
@@ -196,6 +196,76 @@ export default function HeaderMapping() {
       );
     }
   }, [mapping]);
+
+  // Fonction pour traiter le fichier uploadé
+  const handleFilesChanged = async (files: File[]) => {
+    setErrorMessage(null);
+    
+    if (files.length === 0) {
+      return;
+    }
+
+    const file = files[0]; // On prend le premier fichier
+    setIsLoading(true);
+
+    try {
+      // Créer un FormData pour envoyer le fichier
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Envoyer le fichier au backend pour extraction des en-têtes
+      const response = await axios.post('/api/detect-headers', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // Transformer les en-têtes détectés en format attendu
+      if (response.data && Array.isArray(response.data.detected_columns)) {
+        const headers: DetectedHeader[] = response.data.detected_columns.map((column: string, index: number) => ({
+          name: column,
+          index: index,
+          mappedTo: null // Au départ, aucune colonne n'est mappée
+        }));
+        
+        setDetectedHeaders(headers);
+        setIsFileUploaded(true);
+        
+        // Suggestion automatique basée sur la similarité des noms
+        suggestMappings(headers);
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de la détection des en-têtes:", error);
+      setErrorMessage(error.response?.data?.message || "Erreur lors de l'analyse du fichier");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fonction pour suggérer des mappings automatiques basés sur la similarité des noms
+  const suggestMappings = (headers: DetectedHeader[]) => {
+    const newHeaders = [...headers];
+    
+    newHeaders.forEach(header => {
+      // Normaliser le nom de la colonne (minuscules, sans espaces)
+      const normalizedName = header.name.toLowerCase().replace(/\s+/g, '');
+      
+      // Chercher une correspondance dans les en-têtes attendus
+      for (const expected of expectedHeaders) {
+        const normalizedKey = expected.key.toLowerCase();
+        const normalizedLabel = expected.label.toLowerCase().replace(/\s+/g, '');
+        
+        if (normalizedName === normalizedKey || 
+            normalizedName === normalizedLabel ||
+            normalizedName.includes(normalizedKey)) {
+          header.mappedTo = expected.key;
+          break;
+        }
+      }
+    });
+    
+    setDetectedHeaders(newHeaders);
+  };
 
   // Gérer le changement de mapping
   const handleMappingChange = (headerIndex: number, expectedKey: string | null) => {
@@ -307,104 +377,137 @@ export default function HeaderMapping() {
               </DialogContent>
             </Dialog>
 
-            <Button
-              onClick={validateMapping}
-              disabled={!areRequiredFieldsMapped()}
-            >
-              Valider le mapping
-            </Button>
+            {detectedHeaders.length > 0 && (
+              <Button
+                onClick={validateMapping}
+                disabled={!areRequiredFieldsMapped()}
+              >
+                Valider le mapping
+              </Button>
+            )}
           </div>
         </div>
 
-        {!areRequiredFieldsMapped() && (
+        {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 mb-6 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
-            <div>
-              <h3 className="font-medium">Champs obligatoires manquants</h3>
-              <p className="text-sm">
-                Veuillez associer toutes les colonnes obligatoires suivantes :
-              </p>
-              <ul className="list-disc pl-5 mt-1">
-                {getMissingRequiredHeaders().map(header => (
-                  <li key={header} className="text-sm">{header}</li>
-                ))}
-              </ul>
-            </div>
+            <p>{errorMessage}</p>
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-1/2">Nom détecté dans le fichier</TableHead>
-                <TableHead className="w-1/2">Mapper vers</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detectedHeaders.map((header) => {
-                const mappedHeader = getExpectedHeader(header.mappedTo);
-                const isMapped = Boolean(header.mappedTo);
-                const isOpen = openSelects.includes(header.index);
+        {!isFileUploaded ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Importation de fichier</CardTitle>
+              <CardDescription>
+                Commencez par importer votre fichier CSV ou Excel pour détecter ses colonnes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileUpload 
+                onChange={handleFilesChanged}
+              />
+              {isLoading && (
+                <div className="mt-4 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <span className="ml-2">Analyse en cours...</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {!areRequiredFieldsMapped() && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-6 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+                <div>
+                  <h3 className="font-medium">Champs obligatoires manquants</h3>
+                  <p className="text-sm">
+                    Veuillez associer toutes les colonnes obligatoires suivantes :
+                  </p>
+                  <ul className="list-disc pl-5 mt-1">
+                    {getMissingRequiredHeaders().map(header => (
+                      <li key={header} className="text-sm">{header}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
 
-                return (
-                  <TableRow key={header.index}>
-                    <TableCell className="font-medium">{header.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="relative w-full">
-                          <button
-                            type="button"
-                            onClick={() => toggleSelect(header.index)}
-                            className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-950"
-                          >
-                            {header.mappedTo
-                              ? expectedHeaders.find(h => h.key === header.mappedTo)?.label
-                              : "Sélectionner un champ..."}
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </button>
-
-                          {isOpen && (
-                            <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                              <div
-                                role="option"
-                                onClick={() => {
-                                  handleMappingChange(header.index, null);
-                                  toggleSelect(header.index);
-                                }}
-                                className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
-                              >
-                                Ne pas mapper
-                              </div>
-
-                              {expectedHeaders.map((expected) => (
-                                <div
-                                  key={expected.key}
-                                  role="option"
-                                  onClick={() => {
-                                    handleMappingChange(header.index, expected.key);
-                                    toggleSelect(header.index);
-                                  }}
-                                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
-                                >
-                                  {expected.label} {expected.required ? "(obligatoire)" : "(optionnel)"}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {isMapped && (
-                          <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                        )}
-                      </div>
-                    </TableCell>
+            <div className="bg-white rounded-lg shadow-sm border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/2">Nom détecté dans le fichier</TableHead>
+                    <TableHead className="w-1/2">Mapper vers</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {detectedHeaders.map((header) => {
+                    const mappedHeader = getExpectedHeader(header.mappedTo);
+                    const isMapped = Boolean(header.mappedTo);
+                    const isOpen = openSelects.includes(header.index);
+
+                    return (
+                      <TableRow key={header.index}>
+                        <TableCell className="font-medium">{header.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-full">
+                              <button
+                                type="button"
+                                onClick={() => toggleSelect(header.index)}
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-950"
+                              >
+                                {header.mappedTo
+                                  ? expectedHeaders.find(h => h.key === header.mappedTo)?.label
+                                  : "Sélectionner un champ..."}
+                                <ChevronDown className="h-4 w-4 opacity-50" />
+                              </button>
+
+                              {isOpen && (
+                                <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                                  <div
+                                    role="option"
+                                    onClick={() => {
+                                      handleMappingChange(header.index, null);
+                                      toggleSelect(header.index);
+                                    }}
+                                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
+                                  >
+                                    Ne pas mapper
+                                  </div>
+
+                                  {expectedHeaders.map((expected) => (
+                                    <div
+                                      key={expected.key}
+                                      role="option"
+                                      onClick={() => {
+                                        handleMappingChange(header.index, expected.key);
+                                        toggleSelect(header.index);
+                                      }}
+                                      className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
+                                    >
+                                      {expected.label} {expected.required ? "(obligatoire)" : "(optionnel)"}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {isMapped && (
+                              <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
 
         <div className="mt-6 flex gap-4">
           <div className="flex items-center gap-2">

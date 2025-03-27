@@ -32,6 +32,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import axios from 'axios';
 
+interface ErrorItem {
+  type: 'missing_column' | 'invalid_format' | 'connection_error';
+  severity: 'critical' | 'warning';
+  column: string;
+  row?: number;
+  value?: string;
+  message: string;
+  suggestions: string[];
+}
+
 type ValidationReport = {
   isValid: boolean;
   requiredColumns: string[];
@@ -193,7 +203,7 @@ export default function Dashboard() {
 
         if (!report.isValid) {
           // Transformer les erreurs pour les ajouter au store
-          const errors = [];
+          const errors: ErrorItem[] = [];
 
           // Colonnes manquantes
           if (report.missingColumns && report.missingColumns.length > 0) {

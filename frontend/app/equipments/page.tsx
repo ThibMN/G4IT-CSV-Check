@@ -44,6 +44,7 @@ export default function EquipmentPage() {
       // Simuler un appel API avec des données de test
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+
       // Filtrer les données
       let filteredData = [...];
 

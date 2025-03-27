@@ -24,6 +24,7 @@ interface DetectedHeader {
 
 // En-têtes attendus avec leurs descriptions
 const expectedHeaders: ExpectedHeader[] = [
+  // Champs obligatoires
   {
     key: "nomEquipementPhysique",
     label: "Nom de l'équipement",
@@ -34,7 +35,7 @@ const expectedHeaders: ExpectedHeader[] = [
     key: "modele",
     label: "Modèle",
     required: true,
-    description: "Le modèle exact de l'équipement"
+    description: "Le modèle ou la catégorie de l'équipement"
   },
   {
     key: "quantite",
@@ -43,17 +44,127 @@ const expectedHeaders: ExpectedHeader[] = [
     description: "Le nombre d'unités de cet équipement"
   },
   {
-    key: "dateAchat",
-    label: "Date d'achat",
-    required: false,
-    description: "La date à laquelle l'équipement a été acquis (format JJ/MM/AAAA)"
+    key: "nomCourtDatacenter",
+    label: "Datacenter",
+    required: true,
+    description: "L'identifiant du datacenter hébergeant l'équipement"
+  },
+  {
+    key: "type",
+    label: "Type",
+    required: true,
+    description: "Le type d'équipement (Serveur, Ecran, PC, etc.)"
   },
   {
     key: "statut",
     label: "Statut",
-    required: false,
-    description: "L'état actuel de l'équipement (ex: en service, en maintenance, hors service)"
+    required: true,
+    description: "L'état actuel de l'équipement (Active, Inactive, etc.)"
   },
+  {
+    key: "paysDUtilisation",
+    label: "Pays d'utilisation",
+    required: true,
+    description: "Le pays où l'équipement est utilisé"
+  },
+  
+  // Champs optionnels - Informations temporelles
+  {
+    key: "dateAchat",
+    label: "Date d'achat",
+    required: false,
+    description: "La date d'acquisition de l'équipement (format YYYY-MM-DD)"
+  },
+  {
+    key: "dateRetrait",
+    label: "Date de retrait",
+    required: false,
+    description: "La date de mise hors service prévue ou effective (format YYYY-MM-DD)"
+  },
+  {
+    key: "dureeUsageInterne",
+    label: "Durée usage interne",
+    required: false,
+    description: "La durée d'utilisation interne en mois"
+  },
+  {
+    key: "dureeUsageAmont",
+    label: "Durée usage amont",
+    required: false,
+    description: "La durée d'utilisation en amont en mois"
+  },
+  {
+    key: "dureeUsageAval",
+    label: "Durée usage aval",
+    required: false,
+    description: "La durée d'utilisation en aval en mois"
+  },
+  
+  // Champs optionnels - Consommation et utilisation
+  {
+    key: "consoElecAnnuelle",
+    label: "Consommation électrique",
+    required: false,
+    description: "La consommation électrique annuelle en kWh"
+  },
+  {
+    key: "utilisateur",
+    label: "Utilisateur",
+    required: false,
+    description: "Le service ou la personne utilisant l'équipement"
+  },
+  {
+    key: "nomSourceDonnee",
+    label: "Source de données",
+    required: false,
+    description: "La source des données pour cet équipement"
+  },
+  {
+    key: "nomEntite",
+    label: "Entité",
+    required: false,
+    description: "L'entité responsable de l'équipement"
+  },
+  
+  // Champs optionnels - Caractéristiques techniques
+  {
+    key: "nbCoeur",
+    label: "Nombre de cœurs",
+    required: false,
+    description: "Le nombre de cœurs de processeur (pour serveurs/PC)"
+  },
+  {
+    key: "nbJourUtiliseAn",
+    label: "Jours d'utilisation par an",
+    required: false,
+    description: "Le nombre de jours d'utilisation par an"
+  },
+  {
+    key: "goTelecharge",
+    label: "Go téléchargés",
+    required: false,
+    description: "Le volume de données téléchargées en Go"
+  },
+  
+  // Champs optionnels - Modalités d'utilisation
+  {
+    key: "modeUtilisation",
+    label: "Mode d'utilisation",
+    required: false,
+    description: "Le mode d'utilisation (Production, Test, Développement, etc.)"
+  },
+  {
+    key: "tauxUtilisation",
+    label: "Taux d'utilisation",
+    required: false,
+    description: "Le taux d'utilisation moyen (entre 0 et 1)"
+  },
+  {
+    key: "qualite",
+    label: "Qualité",
+    required: false,
+    description: "Le niveau de qualité ou de performance de l'équipement"
+  }
 ];
 
 // Exemple de données détectées (dans une vraie app)

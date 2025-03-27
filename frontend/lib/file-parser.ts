@@ -1,137 +1,12 @@
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import { FileData } from './validation-utils';
 
-// Type pour les données de fichier
-export type FileData = Record<string, any>;
-
-// Interface pour les résultats de lecture de fichier
-export interface ReadResult {
-  fileContent: string | ArrayBuffer | null;
-  fileName: string;
-  fileType: 'csv' | 'xlsx' | 'unsupported';
-  previewData?: any[];
-  error?: string;
-}
-
-// Interface pour les résultats de parsing
+// Interface pour les résultats du parsing de fichier
 export interface ParseResult {
   data: FileData[];
   error?: string;
 }
-
-/**
- * Lit le contenu brut d'un fichier CSV ou XLSX.
- * Fournit uniquement un aperçu simple, sans transformation majeure.
- */
-export const readFile = (file: File): Promise<ReadResult> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    const fileName = file.name;
-    const fileExt = fileName.toLowerCase().split('.').pop() || '';
-    
-    let fileType: 'csv' | 'xlsx' | 'unsupported' = 'unsupported';
-    if (fileExt === 'csv') fileType = 'csv';
-    else if (fileExt === 'xlsx' || fileExt === 'xls') fileType = 'xlsx';
-    
-    if (fileType === 'unsupported') {
-      resolve({
-        fileContent: null,
-        fileName,
-        fileType,
-        error: "Format de fichier non supporté. Veuillez utiliser un fichier CSV ou XLSX."
-      });
-      return;
-    }
-    
-    // Pour CSV, lire comme texte
-    if (fileType === 'csv') {
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          
-          // Générer un aperçu minimal pour l'UI (premiers 3 lignes seulement)
-          let previewData: any[] = [];
-          try {
-            const previewResult = Papa.parse(content, {
-              header: true,
-              skipEmptyLines: true,
-              preview: 3, // Limite à 3 lignes pour l'aperçu
-              transformHeader: (header) => header.trim() // Nettoyage minimal
-            });
-            previewData = previewResult.data;
-          } catch (e) {
-            // Ignorer les erreurs d'aperçu, ce n'est pas critique
-          }
-          
-          resolve({
-            fileContent: content,
-            fileName,
-            fileType,
-            previewData
-          });
-        } catch (error: any) {
-          resolve({
-            fileContent: null,
-            fileName,
-            fileType,
-            error: `Erreur lors de la lecture du fichier: ${error.message || "Erreur inconnue"}`
-          });
-        }
-      };
-      reader.readAsText(file);
-    } 
-    // Pour XLSX, lire comme binaire
-    else {
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result || null;  // Ajouter || null ici pour éviter undefined
-          
-          // Générer un aperçu minimal pour l'UI
-          let previewData: any[] = [];
-          try {
-            const workbook = XLSX.read(content, { type: 'binary' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            previewData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', range: 0, blankrows: false });
-            previewData = previewData.slice(0, 4); // Limiter à 4 lignes (en-tête + 3 lignes)
-          } catch (e) {
-            // Ignorer les erreurs d'aperçu
-          }
-          
-          resolve({
-            fileContent: content,
-            fileName,
-            fileType,
-            previewData
-          });
-        } catch (error: any) {
-          resolve({
-            fileContent: null,
-            fileName,
-            fileType,
-            error: `Erreur lors de la lecture du fichier XLSX: ${error.message || "Erreur inconnue"}`
-          });
-        }
-      };
-      reader.readAsBinaryString(file);
-    }
-    
-    reader.onerror = () => {
-      resolve({
-        fileContent: null,
-        fileName,
-        fileType,
-        error: "Erreur lors de la lecture du fichier"
-      });
-    };
-  });
-};
-
-/**
- * ATTENTION: Ces fonctions sont conservées pour compatibilité,
- * mais idéalement la validation devrait être déléguée au backend.
- * Utiliser readFile() à la place pour de nouveaux développements.
- */
 
 // Parser un fichier CSV
 export const parseCSV = (file: File): Promise<ParseResult> => {
@@ -140,7 +15,11 @@ export const parseCSV = (file: File): Promise<ParseResult> => {
       header: true,
       skipEmptyLines: true,
       transformHeader: (header) => {
-        return header.trim();
+        // Nettoyer les en-têtes (supprimer les espaces, caractères spéciaux)
+        return header.trim()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+          .replace(/\s+/g, '') // Supprimer les espaces
+          .replace(/[^\w]/g, ''); // Supprimer les caractères spéciaux
       },
       complete: (results) => {
         if (results.errors && results.errors.length > 0) {
@@ -170,7 +49,7 @@ export const parseXLSX = (file: File): Promise<ParseResult> => {
 
     reader.onload = (e) => {
       try {
-        const data = e.target?.result || null;
+        const data = e.target?.result;
         if (!data) {
           resolve({ data: [], error: "Erreur lors de la lecture du fichier XLSX" });
           return;
@@ -197,7 +76,11 @@ export const parseXLSX = (file: File): Promise<ParseResult> => {
 
         // Obtenir les en-têtes (première ligne)
         const headers = (jsonData[0] as string[]).map(header => {
-          return String(header).trim();
+          // Nettoyer les en-têtes (supprimer les espaces, caractères spéciaux)
+          return String(header).trim()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+            .replace(/\s+/g, '') // Supprimer les espaces
+            .replace(/[^\w]/g, ''); // Supprimer les caractères spéciaux
         });
 
         // Convertir les données en objets avec les en-têtes

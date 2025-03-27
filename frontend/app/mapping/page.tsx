@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertCircle, HelpCircle, CheckCircle, ChevronDown } from "lucide-react";
 import { useHeaderMappingStore } from "@/store/header-mapping-store";
 import Navbar from "@/components/layout/navbar";
-import { useEquipmentStore } from "@/store/equipment-store";
 
 // Définition des types
 interface ExpectedHeader {
@@ -57,14 +56,20 @@ const expectedHeaders: ExpectedHeader[] = [
   },
 ];
 
+// Exemple de données détectées (dans une vraie app)
+const mockDetectedHeaders: DetectedHeader[] = [
+  { name: "Équipement", index: 0, mappedTo: null },
+  { name: "Type", index: 1, mappedTo: null },
+  { name: "Nombre", index: 2, mappedTo: null },
+  { name: "Date", index: 3, mappedTo: null },
+  { name: "État", index: 4, mappedTo: null },
+];
+
 export default function HeaderMapping() {
   // États locaux
-  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>([]); // Initialisation avec un tableau vide  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [openSelects, setOpenSelects] = useState<number[]>([]);
-  const [error, setError] = useState<string | null>(null); // État pour gérer les erreurs
+  const [detectedHeaders, setDetectedHeaders] = useState<DetectedHeader[]>(mockDetectedHeaders);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-
-  const { importedFile } = useEquipmentStore();
+  const [openSelects, setOpenSelects] = useState<number[]>([]);
 
   // Zustand store pour sauvegarder le mapping
   const { setMapping, mapping } = useHeaderMappingStore();
@@ -73,57 +78,34 @@ export default function HeaderMapping() {
   useEffect(() => {
     if (mapping && Object.keys(mapping).length > 0) {
       setDetectedHeaders(prev =>
-        (prev || []).map(header => ({
+        prev.map(header => ({
           ...header,
           mappedTo: mapping[header.index] || null,
         }))
       );
-    } else if (!detectedHeaders || detectedHeaders.length === 0) {
-      setError("Aucun en-tête détecté. Veuillez vérifier votre fichier.");
     }
-  }, [mapping, detectedHeaders]);
-
-  useEffect(() => {
-    if (!importedFile) {
-      setError("Aucun fichier importé. Veuillez importer un fichier depuis le tableau de bord.");
-      return;
-    }
-
-    // Process the imported file if needed
-    console.log("Imported file:", importedFile);
-  }, [importedFile]);
+  }, [mapping]);
 
   // Gérer le changement de mapping
   const handleMappingChange = (headerIndex: number, expectedKey: string | null) => {
-    if (!detectedHeaders || detectedHeaders.length === 0) {
-      setError("Impossible de mapper les en-têtes : aucun en-tête détecté.");
-      return;
-    }
-  
-    setDetectedHeaders(prev =>
-      prev.map(header =>
-        header.index === headerIndex
-          ? { ...header, mappedTo: expectedKey }
-          : header
-      )
-    );
+    // Mettre à jour l'état local
+    setDetectedHeaders(prev => prev.map(header =>
+      header.index === headerIndex
+        ? { ...header, mappedTo: expectedKey }
+        : header
+    ));
   };
 
   // Valider le mapping
   const validateMapping = () => {
-    if (!areRequiredFieldsMapped()) {
-      setError("Tous les champs obligatoires doivent être mappés avant de valider.");
-      return;
-    }
-  
     const newMapping: Record<number, string> = {};
-  
+
     detectedHeaders.forEach(header => {
       if (header.mappedTo) {
         newMapping[header.index] = header.mappedTo;
       }
     });
-  
+
     setMapping(newMapping);
     alert("Mapping sauvegardé avec succès !");
   };
@@ -241,11 +223,6 @@ export default function HeaderMapping() {
         )}
 
         <div className="bg-white rounded-lg shadow-sm border">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 mb-6">
-              <p>{error}</p>
-            </div>
-          )}
           <Table>
             <TableHeader>
               <TableRow>

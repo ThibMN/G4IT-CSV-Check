@@ -33,7 +33,6 @@ interface EquipmentState {
   // États sélectionnés
   selectedType: EquipmentType | null;
   selectedModel: EquipmentModel | null;
-  importedFile: File | null;
 
   // Données chargées depuis l'API
   equipmentTypes: EquipmentType[];
@@ -56,7 +55,6 @@ interface EquipmentState {
   // Actions
   setSelectedType: (type: EquipmentType | null) => void;
   setSelectedModel: (model: EquipmentModel | null) => void;
-  setImportedFile: (file: File | null) => void;
   setEquipmentTypes: (types: EquipmentType[]) => void;
   setEquipmentModels: (models: EquipmentModel[]) => void;
   setEquipments: (equipments: Equipment[]) => void;
@@ -65,7 +63,6 @@ interface EquipmentState {
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
   resetSelection: () => void;
-  
 
   // Actions pour la consolidation
   setConsolidatedEquipments: (equipments: ConsolidatedEquipment[]) => void;
@@ -81,7 +78,6 @@ export const useEquipmentStore = create<EquipmentState>()(
       // États initiaux
       selectedType: null,
       selectedModel: null,
-      importedFile: null,
       equipmentTypes: [],
       equipmentModels: [],
       equipments: [],
@@ -97,7 +93,6 @@ export const useEquipmentStore = create<EquipmentState>()(
       setSelectedType: (type) => set({ selectedType: type, selectedModel: null }),
       setSelectedModel: (model) => set({ selectedModel: model }),
       setEquipmentTypes: (types) => set({ equipmentTypes: types }),
-      setImportedFile: (file) => set({ importedFile: file }),
       setEquipmentModels: (models) => set({ equipmentModels: models }),
       setEquipments: (equipments) => set({ equipments }),
       setCurrentPage: (page) => set({ currentPage: page }),

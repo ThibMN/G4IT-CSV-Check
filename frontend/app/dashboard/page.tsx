@@ -28,13 +28,30 @@ import { useEquipmentStore } from "@/store/equipment-store";
 import { useErrorStore } from "@/store/error-store";
 import { parseFile } from "@/lib/file-parser";
 import { processFileData, FileData } from "@/lib/validation-utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ErrorDisplay } from '@/components/ui/error-display';
+import axios from 'axios';
+
+type ValidationReport = {
+  isValid: boolean;
+  requiredColumns: string[];
+  optionalColumns: string[];
+  missingColumns: string[];
+  typeErrors: {
+    column: string;
+    row: number;
+    value: string;
+    expectedType: string;
+  }[];
+  detectedColumns: string[];
+};
 
 export default function Dashboard() {
   const router = useRouter();
 
   // Accès aux stores Zustand
-  const { setEquipments, setImportedFile } = useEquipmentStore();
-  const { setErrors, hasCriticalErrors } = useErrorStore();
+  const { setEquipments } = useEquipmentStore();
+  const { setErrors, hasCriticalErrors, addErrors, clearErrors } = useErrorStore();
 
   // États locaux
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -42,6 +59,8 @@ export default function Dashboard() {
   const [processedFiles, setProcessedFiles] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('upload');
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
 
   // Fonctions de navigation
   const navigateToPage = (path: string) => {
@@ -50,8 +69,9 @@ export default function Dashboard() {
 
   // Fonction pour gérer le changement de fichiers
   const handleFileChange = (files: File[]) => {
+    // Remplacer complètement les fichiers au lieu de les ajouter
     setUploadedFiles(files);
-    setImportedFile(files[0] || null); // garde le fiché importé dans le store
+    // Réinitialiser les états
     setProcessingFiles([]);
     setProcessedFiles([]);
     setErrorMessage(null);
@@ -126,6 +146,129 @@ export default function Dashboard() {
   // Vérifier si le tableau a des données
   const hasTableData = tableData.length > 0;
 
+  const handleFilesChanged = async (files: File[]) => {
+    try {
+      // Réinitialiser les erreurs et l'état
+      clearErrors();
+      setValidationReport(null);
+
+      if (files.length === 0) {
+        return;
+      }
+
+      const file = files[0]; // On prend le premier fichier
+
+      // Créer un FormData pour envoyer le fichier
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        // Envoyer le fichier au backend pour validation
+        const response = await axios.post('/api/validate-file', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        console.log('Réponse backend:', response.data);
+
+        // Transformer la réponse pour correspondre au format attendu
+        const report: ValidationReport = {
+          isValid: response.data.is_valid || false,
+          requiredColumns: response.data.required_columns || [],
+          optionalColumns: response.data.optional_columns || [],
+          missingColumns: response.data.missing_required_columns || [],
+          typeErrors: Array.isArray(response.data.type_errors)
+            ? response.data.type_errors.map((error: any) => ({
+                column: error.column || '',
+                row: error.row || 0,
+                value: error.value || '',
+                expectedType: error.expected_type || 'valide'
+              }))
+            : [],
+          detectedColumns: response.data.detected_columns || []
+        };
+
+        setValidationReport(report);
+
+        if (!report.isValid) {
+          // Transformer les erreurs pour les ajouter au store
+          const errors = [];
+
+          // Colonnes manquantes
+          if (report.missingColumns && report.missingColumns.length > 0) {
+            report.missingColumns.forEach(column => {
+              errors.push({
+                type: 'missing_column' as const,
+                severity: 'critical' as const,
+                column,
+                message: `Colonne requise "${column}" manquante dans le fichier CSV.`,
+                suggestions: [
+                  `Ajoutez une colonne nommée "${column}" dans votre fichier CSV.`,
+                  `Vérifiez les en-têtes de colonnes pour les fautes de frappe.`
+                ]
+              });
+            });
+          }
+
+          // Erreurs de type
+          if (report.typeErrors && report.typeErrors.length > 0) {
+            report.typeErrors.forEach(error => {
+              errors.push({
+                type: 'invalid_format' as const,
+                severity: 'warning' as const,
+                column: error.column,
+                row: error.row,
+                value: error.value,
+                message: `Format invalide à la ligne ${error.row}. La valeur "${error.value}" n'est pas de type ${error.expectedType}.`,
+                suggestions: [
+                  `Corrigez la valeur en respectant le format ${error.expectedType}.`,
+                  `Vérifiez si des caractères spéciaux ou espaces supplémentaires sont présents.`
+                ]
+              });
+            });
+          }
+
+          // Ajouter les erreurs au store
+          if (errors.length > 0) {
+            addErrors(errors);
+          }
+        }
+      } catch (apiError: any) {
+        console.error("Erreur API:", apiError);
+        // Afficher une erreur spécifique pour les problèmes de connexion au backend
+        const errorMsg = apiError.response?.data?.error ||
+                         "Impossible de se connecter au serveur de validation. Veuillez vérifier que le backend est en cours d'exécution.";
+
+        addErrors([{
+          type: 'connection_error',
+          severity: 'critical',
+          column: '',
+          message: errorMsg,
+          suggestions: [
+            "Vérifiez que le serveur backend est démarré.",
+            "Vérifiez votre connexion réseau.",
+            "Essayez de rafraîchir la page."
+          ]
+        }]);
+      }
+    } catch (err) {
+      console.error("Erreur générale lors de la validation:", err);
+    }
+  };
+
+  const handleContinueToMapping = () => {
+    if (validationReport?.isValid) {
+      router.push('/mapping');
+    }
+  };
+
+  const handleRetry = () => {
+    // Réinitialiser les erreurs et le rapport de validation
+    clearErrors();
+    setValidationReport(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex flex-col gap-5 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
@@ -189,100 +332,103 @@ export default function Dashboard() {
         </div>
 
         {/* Import de fichiers */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Importation de données</CardTitle>
-            <CardDescription>Téléchargez vos fichiers CSV ou XLSX pour commencer</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <FileUpload onChange={handleFileChange} />
+        <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="upload">Import de fichier</TabsTrigger>
+            <TabsTrigger value="recent">Fichiers récents</TabsTrigger>
+          </TabsList>
 
-              {hasTableData && (
-                <table className="w-full text-sm mt-6">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Nom</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Type</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Statut</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Taille</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Date d'ajout</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.map((item) => (
-                      <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">{item.name}</td>
-                        <td className="py-3 px-4">{item.type}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 ${item.status === 'Traité' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'} rounded-full text-xs`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">{item.size}</td>
-                        <td className="py-3 px-4">{item.date}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            {processingFiles.includes(item.id) ? (
-                              <div className="flex items-center gap-2">
-                                <LoaderData />
-                                <span className="text-xs text-gray-500">Traitement...</span>
-                              </div>
-                            ) : processedFiles.includes(item.id) ? (
-                              <div className="flex items-center gap-2 text-green-600">
-                                <CheckCircle className="h-4 w-4" />
-                                <span className="text-xs">Traité</span>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => handleProcessFile(item.id)}
-                                className="px-3 py-1 h-8"
-                              >
-                                Traiter
-                              </Button>
-                            )}
+          <TabsContent value="upload">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Importer un fichier CSV</CardTitle>
+                    <CardDescription>
+                      Sélectionnez un fichier CSV contenant vos données d'équipements
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <FileUpload onChange={handleFilesChanged} />
+
+                    {validationReport && (
+                      <div className="mt-6">
+                        {validationReport.isValid ? (
+                          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                            <p className="text-green-800 font-medium">Fichier valide !</p>
+                            <p className="text-green-600 text-sm mt-1">
+                              Votre fichier contient toutes les colonnes requises et est prêt pour l'étape suivante.
+                            </p>
                             <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteFile(item.id)}
-                              className="px-2 py-1 h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="mt-3"
+                              onClick={handleContinueToMapping}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              Continuer vers le mapping
                             </Button>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                        ) : (
+                          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                            <p className="text-red-800 font-medium">Fichier invalide</p>
+                            <p className="text-red-600 text-sm mt-1">
+                              Votre fichier contient des erreurs qui doivent être corrigées avant de continuer.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <ErrorDisplay onRetry={handleRetry} />
+              </div>
+
+              <div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Format du fichier</CardTitle>
+                    <CardDescription>
+                      Votre fichier CSV doit respecter le format suivant
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-medium text-sm mb-1">En-têtes requis:</h3>
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <code className="text-xs text-gray-800 whitespace-pre-wrap">
+                            equipmentType, manufacturer, model, quantity
+                          </code>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-sm mb-1">En-têtes optionnels:</h3>
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <code className="text-xs text-gray-800 whitespace-pre-wrap">
+                            cpu, ram, storage, purchaseYear, eol
+                          </code>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </CardContent>
+          </TabsContent>
 
-          {hasTableData && (
-            <CardFooter className="flex justify-between">
-              {processedFiles.length > 0 && (
-                <Button
-                  onClick={() => router.push('/mapping')}
-                  className="flex items-center gap-2"
-                >
-                  Continuer vers le mapping <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={() => setUploadedFiles([])}
-                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer tous les fichiers
-              </Button>
-            </CardFooter>
-          )}
-        </Card>
+          <TabsContent value="recent">
+            <Card>
+              <CardHeader>
+                <CardTitle>Fichiers récents</CardTitle>
+                <CardDescription>
+                  Accédez à vos fichiers récemment importés
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Aucun fichier récent disponible</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Liens rapides */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

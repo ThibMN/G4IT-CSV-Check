@@ -21,12 +21,9 @@ export interface ValidationRule {
 // Définition des en-têtes obligatoires
 export const REQUIRED_HEADERS = [
   "nomEquipementPhysique",
-  "modele",
-  "quantite",
-  "nomCourtDatacenter",
   "type",
   "statut",
-  "paysDUtilisation"
+  "quantite"
 ];
 
 // Définition des règles de validation

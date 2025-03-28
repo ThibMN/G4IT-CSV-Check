@@ -12,6 +12,8 @@ import axios from 'axios';
 import Navbar from "@/components/layout/navbar";
 import { useRouter } from "next/navigation";
 import { useFileStore } from "@/store/file-store";
+import { useProcessedDataStore } from "@/store/processed-data-store";
+import { parseFile } from "@/lib/file-parser"; // Assurez-vous que vous avez cette fonction
 
 // Définition des types
 interface ExpectedHeader {
@@ -188,6 +190,7 @@ export default function HeaderMapping() {
   
   // Zustand store pour sauvegarder le mapping
   const { setMapping, mapping } = useHeaderMappingStore();
+  const { setProcessedData } = useProcessedDataStore();
 
   // Vérifier si un fichier est déjà disponible dans le store global
   useEffect(() => {
@@ -436,7 +439,7 @@ export default function HeaderMapping() {
   };
 
   // Valider le mapping
-  const validateMapping = () => {
+  const validateMapping = async () => {
     const newMapping: Record<number, string> = {};
 
     detectedHeaders.forEach(header => {
@@ -446,7 +449,51 @@ export default function HeaderMapping() {
     });
 
     setMapping(newMapping);
-    alert("Mapping sauvegardé avec succès !");
+    
+    // Traiter les données selon le mapping
+    if (currentFile) {
+      try {
+        setIsLoading(true);
+        
+        // Analyser le fichier
+        const result = await parseFile(currentFile);
+        
+        if (result.error) {
+          setErrorMessage(`Erreur lors de l'analyse du fichier: ${result.error}`);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Appliquer le mapping aux données
+        const rawData = result.data as any[];
+        const processedData = rawData.map(row => {
+          const mappedRow: Record<string, any> = {};
+          
+          // Appliquer le mapping à chaque ligne
+          Object.entries(newMapping).forEach(([indexStr, targetField]) => {
+            const index = parseInt(indexStr);
+            const columnName = detectedHeaders[index]?.name;
+            if (columnName && row[columnName] !== undefined) {
+              mappedRow[targetField] = row[columnName];
+            }
+          });
+          
+          return mappedRow;
+        });
+        
+        // Stocker les données traitées
+        setProcessedData(processedData);
+        
+        // Rediriger vers la page d'export
+        router.push('/export');
+        
+      } catch (err) {
+        console.error("Erreur lors du traitement des données:", err);
+        setErrorMessage("Impossible de traiter les données du fichier.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   // Vérifier si tous les champs obligatoires sont mappés

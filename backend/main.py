@@ -537,6 +537,32 @@ def get_consolidated_equipments():
         logging.error(f"Erreur lors de la récupération des équipements consolidés: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/download-file/{filename}")
+async def download_specific_file(filename: str):
+    """
+    Télécharge un fichier spécifique depuis le répertoire temporaire.
+    
+    Args:
+        filename (str): Nom du fichier à télécharger
+        
+    Returns:
+        FileResponse: Le fichier à télécharger
+    """
+    file_path = os.path.join(TEMP_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Fichier '{filename}' non trouvé")
+    
+    # Vérification de sécurité pour éviter la traversée de répertoire
+    if not os.path.normpath(file_path).startswith(TEMP_DIR):
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/octet-stream"
+    )
+
 @app.post("/api/export", response_class=Response)
 async def export_equipments(data: dict):
     """
@@ -546,7 +572,7 @@ async def export_equipments(data: dict):
         data (dict): Un dictionnaire contenant le format d'export et les équipements à exporter.
 
     Returns:
-        Response: Le fichier CSV ou XLSX à télécharger.
+        Response: Le fichier CSV ou XLSX à télécharger avec des métadonnées.
     """
     try:
         format = data.get("format")
@@ -574,6 +600,14 @@ async def export_equipments(data: dict):
                 "IDs d'origine": ", ".join(eq.get("originalIds", []))
             })
 
+        # Créer un nom de fichier unique avec la date et un identifiant
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        file_id = str(uuid.uuid4())[:8]  # Utiliser les 8 premiers caractères de l'UUID
+        filename = f"export-{current_date}-{file_id}.{format}"
+        
+        # Chemin complet du fichier dans le dossier temporaire
+        file_path = os.path.join(TEMP_DIR, filename)
+        
         # Générer le fichier selon le format demandé
         if format == "csv":
             # Générer un CSV
@@ -587,18 +621,22 @@ async def export_equipments(data: dict):
             writer.writeheader()
             writer.writerows(export_data)
 
+            # Sauvegarder le fichier dans le dossier temporaire
+            with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+                f.write(output.getvalue())
+            
             content = output.getvalue().encode('utf-8-sig')  # Avec BOM pour Excel
             media_type = "text/csv"
-            filename = f"export-{datetime.now().strftime('%Y%m%d')}.csv"
+            
         else:
             # Générer un XLSX
             import pandas as pd
             import io
 
             df = pd.DataFrame(export_data)
-            output = io.BytesIO()
-
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            
+            # Sauvegarder le fichier dans le dossier temporaire
+            with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
                 df.to_excel(writer, sheet_name='Équipements', index=False)
 
                 # Ajuster les largeurs de colonnes
@@ -606,26 +644,43 @@ async def export_equipments(data: dict):
                 for i, col in enumerate(df.columns):
                     max_width = max(df[col].astype(str).map(len).max(), len(col))
                     worksheet.set_column(i, i, max_width + 2)
-
+            
+            # Pour la réponse HTTP
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='Équipements', index=False)
+            
             content = output.getvalue()
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            filename = f"export-{datetime.now().strftime('%Y%m%d')}.xlsx"
 
-        # Enregistrer l'historique d'export (dans une vraie application)
-        # export_id = save_export_history(filename, format, len(equipments))
+        # Enregistrer les métadonnées du fichier exporté (dans une vraie application, 
+        # cela serait fait dans une base de données)
+        export_metadata = {
+            "id": f"exp-{file_id}",
+            "filename": filename,
+            "dateExported": datetime.now().isoformat(),
+            "format": format,
+            "equipmentCount": len(equipments),
+            "filePath": file_path
+        }
+        
+        logger.info(f"Fichier exporté sauvegardé: {file_path}")
+        logger.info(f"Métadonnées d'export: {export_metadata}")
 
         # Retourner le fichier
         return Response(
             content=content,
             media_type=media_type,
             headers={
-                "Content-Disposition": f"attachment; filename={filename}"
+                "Content-Disposition": f"attachment; filename={filename}",
+                "X-Export-ID": export_metadata["id"],
+                "X-Export-Path": file_path
             }
         )
     except HTTPException as he:
         raise he
     except Exception as e:
-        logging.error(f"Erreur lors de l'export des équipements: {e}")
+        logger.error(f"Erreur lors de l'export des équipements: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/detect-headers")

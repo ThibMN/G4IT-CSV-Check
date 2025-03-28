@@ -338,35 +338,37 @@ async def get_equipments(
     type: str = None
 ):
     """
-    Récupère la liste des équipements avec pagination et filtrage
+    Récupère la liste des équipements depuis un fichier CSV avec pagination et filtrage.
     """
     try:
-        # Créer un tableau de données de test (à remplacer par une vraie base de données)
+        # Chemin du fichier CSV importé (vous pouvez le stocker dans une variable globale ou une base de données)
+        csv_file_path = os.path.join(TEMP_DIR, "uploaded_file.csv")
+
+        # Vérifier si le fichier existe
+        if not os.path.exists(csv_file_path):
+            raise HTTPException(status_code=404, detail="Aucun fichier CSV importé trouvé")
+
+        # Lire les données du fichier CSV
         equipments = []
-        equipment_types = ["Laptop", "Desktop", "Server", "Monitor", "Printer"]
-        manufacturers = ["Dell", "HP", "Lenovo", "Apple", "ASUS"]
-
-        for i in range(1, 51):
-            equipment_type = equipment_types[i % len(equipment_types)]
-            manufacturer = manufacturers[i % len(manufacturers)]
-
-            equipment = {
-                "id": f"eq-{i}",
-                "equipmentType": equipment_type,
-                "manufacturer": manufacturer,
-                "model": f"Model-{i}",
-                "quantity": (i % 10) + 1,
-                "cpu": f"CPU-{i}" if i % 3 != 0 else None,
-                "ram": f"{(i % 4 + 1) * 8}GB" if i % 2 == 0 else None,
-                "storage": f"{(i % 3 + 1) * 256}GB" if i % 2 == 0 else None,
-                "purchaseYear": str(2020 + (i % 4)) if i % 3 != 0 else None,
-                "eol": str(2025 + (i % 4)) if i % 3 != 0 else None
-            }
-            equipments.append(equipment)
+        with open(csv_file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for idx, row in enumerate(reader):
+                equipment = {
+                    "id": f"eq-{idx+1}",
+                    "equipmentType": row.get("type", "Inconnu"),
+                    "manufacturer": row.get("fabricant", "Non spécifié"),
+                    "model": row.get("modele", "Inconnu"),
+                    "quantity": int(row.get("quantite", "1")) if row.get("quantite", "").isdigit() else 1,
+                    "cpu": row.get("cpu", None),
+                    "ram": row.get("ram", None),
+                    "storage": row.get("stockage", None),
+                    "purchaseYear": row.get("dateAchat", None),
+                    "eol": row.get("dateRetrait", None),
+                }
+                equipments.append(equipment)
 
         # Filtrer les équipements
         filtered_equipments = equipments
-
         if search:
             search_lower = search.lower()
             filtered_equipments = [
@@ -384,17 +386,9 @@ async def get_equipments(
                 if eq["equipmentType"] == type
             ]
 
-        # Calculer la pagination
+        # Pagination
         total_items = len(filtered_equipments)
         total_pages = (total_items + limit - 1) // limit  # Ceil division
-
-        # S'assurer que la page demandée est valide
-        if page < 1:
-            page = 1
-        elif page > total_pages and total_pages > 0:
-            page = total_pages
-
-        # Extraire les éléments pour la page demandée
         start_idx = (page - 1) * limit
         end_idx = min(start_idx + limit, total_items)
         paged_equipments = filtered_equipments[start_idx:end_idx]

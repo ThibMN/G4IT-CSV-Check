@@ -74,13 +74,21 @@ export default function ConsolidationPage() {
     try {
       setIsLoading(true);
       setError(null);
-
-      // Simuler un appel API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Utiliser des données de test
-      const mockEquipments = getMockEquipments().map(eq => ({ ...eq, selected: false }));
-      setEquipments(mockEquipments);
+  
+      // Call the backend API to fetch equipments
+      const response = await axios.get('/api/equipments', {
+        params: {
+          page: 1, // You can adjust pagination as needed
+          limit: 50, // Adjust the limit based on your requirements
+        },
+      });
+  
+      // Set the fetched equipments to state
+      const fetchedEquipments = response.data.equipments.map((eq: any) => ({
+        ...eq,
+        selected: false, // Add the `selected` property for UI handling
+      }));
+      setEquipments(fetchedEquipments);
     } catch (err) {
       console.error('Erreur lors du chargement des équipements:', err);
       setError('Impossible de charger les équipements. Veuillez réessayer.');

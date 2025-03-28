@@ -1,4 +1,5 @@
 import csv as csv_module
+import logging
 from .utils import validate_columns, G4IT_COLUMN_SPECS
 
 class CsvHandler:
@@ -233,3 +234,19 @@ class CsvHandler:
                 "is_valid": False,
                 "general_error": f"Erreur lors de la validation: {str(e)}"
             }
+            
+    def get_headers(self):
+        try:
+            # Détecter le délimiteur
+            with open(self.file, 'r', encoding='utf-8', errors='replace') as f:
+                first_line = f.readline().strip()
+                delimiter = ';' if ';' in first_line else ','
+            
+            # Lire les en-têtes avec le bon délimiteur
+            with open(self.file, 'r', encoding='utf-8', errors='replace') as f:
+                reader = csv_module.reader(f, delimiter=delimiter)
+                headers = next(reader)  # Prendre la première ligne
+                return [h.strip() for h in headers]  # Nettoyer les espaces
+        except Exception as e:
+            logging.error(f"Erreur lors de la lecture des en-têtes CSV: {str(e)}")
+            raise ValueError(f"Format CSV invalide: {str(e)}")

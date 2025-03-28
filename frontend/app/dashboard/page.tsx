@@ -31,6 +31,7 @@ import { processFileData, FileData } from "@/lib/validation-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import axios from 'axios';
+import { useFileStore } from "@/store/file-store";
 
 interface ErrorItem {
   type: 'missing_column' | 'invalid_format' | 'connection_error';
@@ -62,6 +63,7 @@ export default function Dashboard() {
   // Accès aux stores Zustand
   const { setEquipments } = useEquipmentStore();
   const { setErrors, hasCriticalErrors, addErrors, clearErrors } = useErrorStore();
+  const { setCurrentFile, setDetectedColumns } = useFileStore();
 
   // États locaux
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -71,6 +73,12 @@ export default function Dashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Vérifier si nous sommes côté client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Fonctions de navigation
   const navigateToPage = (path: string) => {
@@ -163,10 +171,12 @@ export default function Dashboard() {
       setValidationReport(null);
 
       if (files.length === 0) {
+        setCurrentFile(null); // Mettre à jour le store global
         return;
       }
 
       const file = files[0]; // On prend le premier fichier
+      setCurrentFile(file); // Stocker le fichier dans le store global
 
       // Créer un FormData pour envoyer le fichier
       const formData = new FormData();
@@ -181,6 +191,11 @@ export default function Dashboard() {
         });
 
         console.log('Réponse backend:', response.data);
+        
+        // Stocker les colonnes détectées dans le store global
+        if (response.data.detected_columns) {
+          setDetectedColumns(response.data.detected_columns);
+        }
 
         // Transformer la réponse pour correspondre au format attendu
         const report: ValidationReport = {
@@ -268,8 +283,12 @@ export default function Dashboard() {
   };
 
   const handleContinueToMapping = () => {
-    if (validationReport?.isValid) {
+    // Permettre le passage au mapping même si le fichier n'est pas complètement valide
+    // tant que des colonnes ont été détectées
+    if (validationReport?.detectedColumns && validationReport.detectedColumns.length > 0) {
       router.push('/mapping');
+    } else {
+      setErrorMessage("Le fichier chargé ne contient aucune colonne détectable");
     }
   };
 
@@ -278,6 +297,17 @@ export default function Dashboard() {
     clearErrors();
     setValidationReport(null);
   };
+
+  // Conditionnez le rendu pour éviter les incohérences d'hydratation
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="p-8 rounded-lg text-center">
+          <p>Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -377,11 +407,47 @@ export default function Dashboard() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                            <p className="text-red-800 font-medium">Fichier invalide</p>
-                            <p className="text-red-600 text-sm mt-1">
-                              Votre fichier contient des erreurs qui doivent être corrigées avant de continuer.
-                            </p>
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                            <p className="text-amber-800 font-medium">Fichier avec des problèmes</p>
+                            {validationReport.missingColumns && validationReport.missingColumns.length > 0 ? (
+                              <>
+                                <p className="text-amber-600 text-sm mt-1">
+                                  Certaines colonnes requises semblent manquantes. Vous pouvez soit:
+                                </p>
+                                <ul className="list-disc pl-5 mt-1 text-amber-600 text-sm">
+                                  <li>Corriger votre fichier source et le recharger</li>
+                                  <li>Procéder au mapping manuel des colonnes existantes</li>
+                                </ul>
+                              </>
+                            ) : validationReport.typeErrors && validationReport.typeErrors.length > 0 ? (
+                              <>
+                                <p className="text-amber-600 text-sm mt-1">
+                                  Votre fichier contient des erreurs de format, mais vous pouvez quand même procéder au mapping des colonnes.
+                                  Les erreurs de données devront être corrigées ultérieurement.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-amber-600 text-sm mt-1">
+                                Votre fichier contient des erreurs de format qui doivent être corrigées avant de continuer.
+                              </p>
+                            )}
+                            <div className="mt-3 flex gap-2">
+                              {/* Autoriser l'accès au mapping pour tous les types d'erreurs tant qu'il y a des colonnes */}
+                              {validationReport.detectedColumns && validationReport.detectedColumns.length > 0 && (
+                                <Button 
+                                  variant="outline"
+                                  onClick={handleContinueToMapping}
+                                >
+                                  Procéder au mapping manuel
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost"
+                                onClick={handleRetry}
+                              >
+                                Recharger un fichier
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>

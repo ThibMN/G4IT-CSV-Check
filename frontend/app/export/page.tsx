@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import axios from 'axios';
+import { useProcessedDataStore } from "@/store/processed-data-store";
 
 // Type pour les équipements consolidés
 type ConsolidatedEquipment = {
@@ -40,11 +41,42 @@ export default function ExportPage() {
   const [error, setError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Récupérer les données traitées du store
+  const { processedData } = useProcessedDataStore();
 
   // Charger les équipements consolidés
   useEffect(() => {
-    fetchConsolidatedEquipments();
-  }, []);
+    if (processedData.length > 0) {
+      // Convertir les données traitées au format attendu par l'interface
+      const convertedEquipments = processedData.map((item, index) => {
+        // Créer un objet ConsolidatedEquipment à partir des données traitées
+        const consolidatedItem: ConsolidatedEquipment = {
+          id: `processed-${index}`,
+          equipmentType: item.type || 'Non spécifié',
+          manufacturer: item.fabricant || 'Non spécifié',
+          model: item.modele || 'Non spécifié',
+          quantity: parseInt(item.quantite) || 1,
+          originalIds: [item.nomEquipementPhysique || `item-${index}`]
+        };
+        
+        // Ajouter les champs optionnels s'ils existent
+        if (item.nbCoeur) consolidatedItem.cpu = item.nbCoeur.toString();
+        if (item.ram) consolidatedItem.ram = item.ram;
+        if (item.stockage) consolidatedItem.storage = item.stockage;
+        if (item.dateAchat) consolidatedItem.purchaseYear = item.dateAchat;
+        if (item.dateRetrait) consolidatedItem.eol = item.dateRetrait;
+        
+        return consolidatedItem;
+      });
+      
+      setConsolidatedEquipments(convertedEquipments);
+      setIsLoading(false);
+    } else {
+      // Si pas de données traitées, charger les données de test
+      fetchConsolidatedEquipments();
+    }
+  }, [processedData]);
 
   // Fonction pour récupérer les équipements consolidés
   const fetchConsolidatedEquipments = async () => {
@@ -291,7 +323,10 @@ export default function ExportPage() {
               ) : (
                 <div className="space-y-6">
                   <div className="p-4 bg-blue-50 rounded-md">
-                    <h3 className="font-medium text-blue-800 mb-2">Résumé des équipements</h3>
+                    <h3 className="font-medium text-blue-800 mb-2">
+                      Résumé des équipements 
+                      {processedData.length > 0 ? ' (Fichier importé)' : ' (Données de test)'}
+                    </h3>
                     <ul className="space-y-1 text-sm">
                       <li>Nombre total d'équipements : {consolidatedEquipments.reduce((sum, eq) => sum + eq.quantity, 0)}</li>
                       <li>Nombre de types d'équipements : {new Set(consolidatedEquipments.map(eq => eq.equipmentType)).size}</li>

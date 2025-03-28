@@ -53,60 +53,12 @@ export interface NewFileError {
   corrected?: boolean;
 }
 
-// Exemples d'erreurs pour le développement
-const mockErrors: FileError[] = [
-  {
-    id: 1,
-    type: "En-tête manquant",
-    colonne: "nomEquipementPhysique",
-    gravite: "critique",
-    suggestion: "Ajoutez cette colonne au fichier source.",
-    corrigee: false
-  },
-  {
-    id: 2,
-    type: "Format incorrect",
-    colonne: "dateAchat",
-    gravite: "mineure",
-    valeur: "03/15/2023",
-    suggestion: "Convertissez au format YYYY-MM-DD : 2023-03-15",
-    corrigee: false
-  },
-  {
-    id: 3,
-    type: "Valeur vide",
-    colonne: "statut",
-    gravite: "mineure",
-    valeur: "",
-    suggestion: "Renseignez une valeur par défaut : 'En service'.",
-    corrigee: false
-  },
-  {
-    id: 4,
-    type: "Valeur hors limites",
-    colonne: "quantite",
-    gravite: "critique",
-    valeur: "-5",
-    suggestion: "La quantité doit être un nombre positif.",
-    corrigee: false
-  },
-  {
-    id: 5,
-    type: "Format incorrect",
-    colonne: "type",
-    gravite: "mineure",
-    valeur: "écran",
-    suggestion: "Standardisez le type : 'Écran'",
-    corrigee: false
-  }
-];
-
 // Création du store avec persistance
 export const useErrorStore = create<ErrorState>()(
   persist(
     (set, get) => ({
       // États initiaux
-      errors: mockErrors, // Pour le développement, utiliser les erreurs mock
+      errors: [],
       isLoading: false,
       error: null,
 

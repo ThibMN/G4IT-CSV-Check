@@ -55,9 +55,6 @@ export default function EquipmentPage() {
   useEffect(() => {
     if (currentFile) {
       loadFileData(currentFile);
-    } else {
-      // Si pas de fichier, charger des données de test
-      fetchEquipments();
     }
   }, [currentFile]);
 
@@ -94,48 +91,6 @@ export default function EquipmentPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Fonction pour récupérer les équipements (données de test)
-  const fetchEquipments = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Simuler un appel API avec des données de test
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Données de test
-      const mockData = getMockEquipments();
-      setAllEquipments(mockData); // Stocker toutes les données
-
-      // Appliquer les filtres et la pagination
-      applyFiltersAndPagination(mockData);
-    } catch (err) {
-      console.error("Erreur lors du chargement des équipements:", err);
-      setError("Impossible de charger les équipements. Veuillez réessayer.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fonction pour obtenir des données de test
-  const getMockEquipments = (): Equipment[] => {
-    return Array(50).fill(null).map((_, index) => ({
-      id: `eq-${index + 1}`,
-      nomEquipementPhysique: `Équipement ${index + 1}`,
-      modele: `Modèle-${index + 1}`,
-      quantite: Math.floor(Math.random() * 10) + 1,
-      nomCourtDatacenter: ['DC-Paris', 'DC-Lyon', 'DC-Marseille', 'DC-Lille', 'DC-Bordeaux'][Math.floor(Math.random() * 5)],
-      type: ['PC Portable', 'PC Fixe', 'Serveur', 'Ecran', 'Réseau', 'Stockage', 'Smartphone'][Math.floor(Math.random() * 7)],
-      statut: ['Actif', 'En panne', 'En maintenance', 'Retiré'][Math.floor(Math.random() * 4)],
-      paysDUtilisation: ['France', 'Allemagne', 'Espagne', 'Italie', 'Royaume-Uni'][Math.floor(Math.random() * 5)],
-      dateAchat: Math.random() > 0.3 ? ['2020', '2021', '2022', '2023'][Math.floor(Math.random() * 4)] : undefined,
-      dateRetrait: Math.random() > 0.3 ? ['2025', '2026', '2027', '2028'][Math.floor(Math.random() * 4)] : undefined,
-      nbCoeur: Math.random() > 0.3 ? [4, 8, 16, 32, 64][Math.floor(Math.random() * 5)] : undefined,
-      tauxUtilisation: Math.random() > 0.3 ? ['25%', '50%', '75%', '90%'][Math.floor(Math.random() * 4)] : undefined,
-      consoElecAnnuelle: Math.random() > 0.3 ? ['120kWh', '240kWh', '480kWh', '960kWh'][Math.floor(Math.random() * 4)] : undefined
-    }));
   };
 
   // Fonction pour changer de page

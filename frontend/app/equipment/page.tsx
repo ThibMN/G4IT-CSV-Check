@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, Loader2 } from "lucide-react";
+import { Search, Filter, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useFileStore } from "@/store/file-store";
+import { useRouter } from "next/navigation";
 
 type Equipment = {
   id: string;
@@ -21,7 +23,6 @@ type Equipment = {
 };
 
 export default function EquipmentPage() {
-  // États pour les données et les filtres
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,25 +30,99 @@ export default function EquipmentPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("");
-
-  // Charger les équipements
+  const [allEquipments, setAllEquipments] = useState<Equipment[]>([]);
+  
+  const { currentFile } = useFileStore();
+  const router = useRouter();
+  
   useEffect(() => {
-    fetchEquipments();
-  }, [currentPage, searchTerm, filterType]);
+    if (currentFile) {
+      processUploadedFile();
+    } else {
+      fetchEquipments();
+    }
+  }, [currentFile]);
+  
+  useEffect(() => {
+    if (allEquipments.length > 0) {
+      applyFiltersAndPagination();
+    }
+  }, [currentPage, searchTerm, filterType, allEquipments]);
+  
+  const processUploadedFile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      if (!currentFile) {
+        setError("Aucun fichier n'est disponible. Veuillez retourner au dashboard pour en charger un.");
+        setIsLoading(false);
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      
+      const response = await fetch('/api/process-uploaded-file', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      setAllEquipments(data.equipments || []);
+      
+      applyFiltersAndPagination(data.equipments);
+      
+    } catch (err: any) {
+      console.error("Erreur lors du traitement du fichier:", err);
+      setError("Impossible de traiter le fichier. " + (err.message || "Veuillez réessayer."));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const applyFiltersAndPagination = (data = allEquipments) => {
+    let filteredData = [...data];
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredData = filteredData.filter(eq =>
+        (eq.model && eq.model.toLowerCase().includes(term)) ||
+        (eq.manufacturer && eq.manufacturer.toLowerCase().includes(term)) ||
+        (eq.equipmentType && eq.equipmentType.toLowerCase().includes(term))
+      );
+    }
+    
+    if (filterType) {
+      filteredData = filteredData.filter(eq => eq.equipmentType === filterType);
+    }
+    
+    const itemsPerPage = 10;
+    const totalItems = filteredData.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+    
+    setEquipments(paginatedData);
+    setTotalPages(totalPages || 1);
+  };
 
-  // Fonction pour récupérer les équipements
   const fetchEquipments = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Simuler un appel API avec des données de test
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Données de test
       const mockData = getMockEquipments();
 
-      // Filtrer les données
       let filteredData = [...mockData];
 
       if (searchTerm) {
@@ -63,7 +138,6 @@ export default function EquipmentPage() {
         filteredData = filteredData.filter(eq => eq.equipmentType === filterType);
       }
 
-      // Pagination
       const itemsPerPage = 10;
       const totalItems = filteredData.length;
       const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -82,7 +156,6 @@ export default function EquipmentPage() {
     }
   };
 
-  // Fonction pour obtenir des données de test
   const getMockEquipments = (): Equipment[] => {
     return Array(50).fill(null).map((_, index) => ({
       id: `eq-${index + 1}`,
@@ -98,29 +171,62 @@ export default function EquipmentPage() {
     }));
   };
 
-  // Fonction pour changer de page
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber);
   };
 
-  // Fonction pour rechercher
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1); // Réinitialiser à la première page
+    setCurrentPage(1);
   };
 
-  // Fonction pour réinitialiser les filtres
   const resetFilters = () => {
     setSearchTerm("");
     setFilterType("");
     setCurrentPage(1);
   };
 
+  const goToDashboard = () => {
+    router.push('/dashboard');
+  };
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Équipements</h1>
 
-      {/* Erreur */}
+      {!currentFile && !isLoading && (
+        <Card className="mb-6">
+          <CardContent className="flex items-center justify-between p-6">
+            <div>
+              <h3 className="font-medium">Aucun fichier chargé</h3>
+              <p className="text-sm text-gray-500">
+                Vous visualisez des données de démonstration. Chargez un fichier pour voir vos propres données.
+              </p>
+            </div>
+            <Button onClick={goToDashboard}>
+              <Upload className="h-4 w-4 mr-2" />
+              Charger un fichier
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentFile && (
+        <Card className="mb-6">
+          <CardContent className="flex items-center justify-between p-6">
+            <div>
+              <h3 className="font-medium">Fichier chargé: {currentFile.name}</h3>
+              <p className="text-sm text-gray-500">
+                Vous visualisez les données de votre fichier.
+              </p>
+            </div>
+            <Button variant="outline" onClick={goToDashboard}>
+              Changer de fichier
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
           <h3 className="font-medium text-red-800">{error}</h3>
@@ -135,7 +241,6 @@ export default function EquipmentPage() {
         </div>
       )}
 
-      {/* Filtres */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Filtrer les équipements</CardTitle>
@@ -183,7 +288,6 @@ export default function EquipmentPage() {
         </CardContent>
       </Card>
 
-      {/* Tableau d'équipements */}
       <Card>
         <CardHeader>
           <CardTitle>Liste des équipements</CardTitle>
@@ -234,7 +338,6 @@ export default function EquipmentPage() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
           <div className="flex space-x-1">

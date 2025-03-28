@@ -664,3 +664,68 @@ async def detect_headers(file: UploadFile = File(...)):
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
         raise HTTPException(status_code=500, detail=f"Erreur lors de la détection des en-têtes: {str(e)}")
+
+
+@app.post("/api/process-file-data")
+async def process_file_data(file: UploadFile = File(...)):
+    """
+    Traite le fichier chargé et renvoie les données formatées pour l'affichage.
+    """
+    try:
+        logger.info(f"Traitement du fichier: {file.filename}")
+        
+        # Sauvegarder temporairement le fichier
+        file_path = os.path.join(TEMP_DIR, f"upload_{uuid.uuid4()}{os.path.splitext(file.filename)[1]}")
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+            
+        # Déterminer le type de fichier
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        
+        data = []
+        if file_extension == '.csv':
+            handler = CsvHandler(file_path)
+            data = handler.load_data()
+        elif file_extension in ['.xlsx', '.xls']:
+            handler = XlsxHandler(file_path)
+            data = handler.load_data()
+        else:
+            os.remove(file_path)
+            raise HTTPException(status_code=400, detail="Format de fichier non supporté")
+        
+        # Nettoyer le fichier temporaire
+        os.remove(file_path)
+        
+        # Formater les données pour correspondre à la structure attendue par le frontend
+        equipments = []
+        for idx, row in enumerate(data):
+            equipment = {
+                "id": f"eq-{idx+1}",
+                "equipmentType": row.get("type", "Inconnu"),
+                "manufacturer": "Non spécifié",  # Cette information n'est pas dans G4IT_COLUMN_SPECS
+                "model": row.get("modele", "Inconnu"),
+                "quantity": int(row.get("quantite", "1")) if row.get("quantite", "").isdigit() else 1,
+                "cpu": row.get("nbCoeur", None),
+                "ram": None,  # Pas dans G4IT_COLUMN_SPECS
+                "storage": None,  # Pas dans G4IT_COLUMN_SPECS
+                "purchaseYear": row.get("dateAchat", None)[:4] if row.get("dateAchat") else None,
+                "eol": row.get("dateRetrait", None)[:4] if row.get("dateRetrait") else None,
+                # Ajouter d'autres champs selon votre modèle de données
+            }
+            equipments.append(equipment)
+            
+        # Préparer la réponse paginée
+        total_items = len(equipments)
+        # On renvoie toutes les données, la pagination se fera côté frontend
+        
+        return {
+            "equipments": equipments,
+            "total_items": total_items,
+            "total_pages": 1,  # Pagination côté frontend
+            "page": 1,
+            "limit": total_items
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement du fichier: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du fichier: {str(e)}")

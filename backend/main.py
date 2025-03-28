@@ -7,6 +7,7 @@ import os
 import uuid
 import logging
 import csv
+import re
 import pandas as pd
 from models import CsvHandler, XlsxHandler, check_file, validate_columns, G4IT_COLUMN_SPECS
 from datetime import datetime
@@ -140,39 +141,102 @@ async def validate_file(file: UploadFile = File(...)):
 
         # Valider le contenu du fichier si toutes les colonnes requises sont présentes
         if not missing_required_columns:
-            # Ici, vous pouvez ajouter votre propre logique de validation
-            # Par exemple, vérifier les types de données dans chaque colonne
-
-            # Pour l'exemple, nous allons simuler quelques erreurs de type
+            # Utiliser G4IT_COLUMN_SPECS pour une validation complète des types
+            logger.info("Validation des types de données pour toutes les colonnes...")
+            
             if file_extension == '.csv':
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                         reader = csv.DictReader(f, delimiter=delimiter)
-                        for row_index, row in enumerate(reader, start=2):  # 2 car l'entête est la ligne 1
-                            # Vérifier que quantity est un nombre
-                            if 'quantity' in row and row['quantity']:
+                        for row_index, row in enumerate(reader, start=2):  # Ligne 2 car l'entête est la ligne 1
+                            for column in row.keys():
+                                if column not in G4IT_COLUMN_SPECS:
+                                    continue
+                                
+                                value = row[column]
+                                if value is None or (isinstance(value, str) and value.strip() == ''):
+                                    # Vérifier si le champ vide est obligatoire
+                                    if G4IT_COLUMN_SPECS[column]['required']:
+                                        type_errors.append({
+                                            "column": column,
+                                            "row": row_index,
+                                            "value": "",
+                                            "expected_type": G4IT_COLUMN_SPECS[column]['type'],
+                                            "error": "Champ obligatoire manquant"
+                                        })
+                                    continue
+                                    
+                                # Validation plus stricte selon le type attendu
+                                expected_type = G4IT_COLUMN_SPECS[column]['type']
                                 try:
-                                    float(row['quantity'])
-                                except ValueError:
+                                    if expected_type == 'integer':
+                                        # Vérifier strictement que c'est un entier
+                                        if not isinstance(value, str) or not value.isdigit():
+                                            raise ValueError("La valeur n'est pas un entier valide")
+                                    elif expected_type == 'number':
+                                        # Vérifier strictement que c'est un nombre
+                                        if not isinstance(value, str) or not all(c.isdigit() or c == '.' for c in value):
+                                            raise ValueError("La valeur n'est pas un nombre valide")
+                                        float(value)  # Essai de conversion pour confirmer
+                                    elif expected_type == 'date':
+                                        # Vérification stricte du format YYYY-MM-DD
+                                        if not isinstance(value, str) or not re.match(r'^\d{4}-\d{2}-\d{2}$', value):
+                                            raise ValueError("Format de date invalide (doit être YYYY-MM-DD)")
+                                        # Vérifier que c'est une date valide
+                                        datetime.strptime(value, '%Y-%m-%d')
+                                except Exception as e:
+                                    # Ajouter l'erreur à la liste
                                     type_errors.append({
-                                        "column": "quantity",
+                                        "column": column,
                                         "row": row_index,
-                                        "value": row['quantity'],
-                                        "expected_type": "nombre"
+                                        "value": value,
+                                        "expected_type": expected_type,
+                                        "error": f"La valeur n'est pas au format {expected_type} attendu: {str(e)}"
                                     })
                 except Exception as e:
                     logger.error(f"Erreur lors de la validation du CSV: {str(e)}")
+                    
             elif file_extension in ['.xlsx', '.xls']:
                 try:
                     df = pd.read_excel(file_path)
-                    if 'quantity' in df.columns:
-                        for row_index, value in enumerate(df['quantity'], start=2):
-                            if pd.notna(value) and not isinstance(value, (int, float)):
+                    for column in [col for col in df.columns if col in G4IT_COLUMN_SPECS]:
+                        expected_type = G4IT_COLUMN_SPECS[column]['type']
+                        for row_index, value in enumerate(df[column], start=2):
+                            # Gérer les valeurs manquantes
+                            if pd.isna(value):
+                                if G4IT_COLUMN_SPECS[column]['required']:
+                                    type_errors.append({
+                                        "column": column,
+                                        "row": row_index,
+                                        "value": "",
+                                        "expected_type": expected_type,
+                                        "error": "Champ obligatoire manquant"
+                                    })
+                                continue
+                                
+                            # Validation selon le type attendu
+                            try:
+                                if expected_type == 'integer':
+                                    if not isinstance(value, int) and not (isinstance(value, float) and value.is_integer()):
+                                        raise ValueError("Pas un entier")
+                                elif expected_type == 'number':
+                                    if not isinstance(value, (int, float)):
+                                        raise ValueError("Pas un nombre")
+                                elif expected_type == 'date':
+                                    if not isinstance(value, (datetime, pd.Timestamp)):
+                                        # Si c'est une chaîne, vérifier le format YYYY-MM-DD
+                                        if isinstance(value, str) and not re.match(r'^\d{4}-\d{2}-\d{2}$', value):
+                                            raise ValueError("Format de date invalide")
+                                        # Essayer de convertir en date
+                                        if isinstance(value, str):
+                                            datetime.strptime(value, '%Y-%m-%d')
+                            except Exception as e:
                                 type_errors.append({
-                                    "column": "quantity",
+                                    "column": column,
                                     "row": row_index,
                                     "value": str(value),
-                                    "expected_type": "nombre"
+                                    "expected_type": expected_type,
+                                    "error": f"La valeur n'est pas au format {expected_type} attendu ({str(e)})"
                                 })
                 except Exception as e:
                     logger.error(f"Erreur lors de la validation du fichier Excel: {str(e)}")
@@ -473,6 +537,32 @@ def get_consolidated_equipments():
         logging.error(f"Erreur lors de la récupération des équipements consolidés: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/download-file/{filename}")
+async def download_specific_file(filename: str):
+    """
+    Télécharge un fichier spécifique depuis le répertoire temporaire.
+    
+    Args:
+        filename (str): Nom du fichier à télécharger
+        
+    Returns:
+        FileResponse: Le fichier à télécharger
+    """
+    file_path = os.path.join(TEMP_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Fichier '{filename}' non trouvé")
+    
+    # Vérification de sécurité pour éviter la traversée de répertoire
+    if not os.path.normpath(file_path).startswith(TEMP_DIR):
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/octet-stream"
+    )
+
 @app.post("/api/export", response_class=Response)
 async def export_equipments(data: dict):
     """
@@ -482,7 +572,7 @@ async def export_equipments(data: dict):
         data (dict): Un dictionnaire contenant le format d'export et les équipements à exporter.
 
     Returns:
-        Response: Le fichier CSV ou XLSX à télécharger.
+        Response: Le fichier CSV ou XLSX à télécharger avec des métadonnées.
     """
     try:
         format = data.get("format")
@@ -510,6 +600,14 @@ async def export_equipments(data: dict):
                 "IDs d'origine": ", ".join(eq.get("originalIds", []))
             })
 
+        # Créer un nom de fichier unique avec la date et un identifiant
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        file_id = str(uuid.uuid4())[:8]  # Utiliser les 8 premiers caractères de l'UUID
+        filename = f"export-{current_date}-{file_id}.{format}"
+        
+        # Chemin complet du fichier dans le dossier temporaire
+        file_path = os.path.join(TEMP_DIR, filename)
+        
         # Générer le fichier selon le format demandé
         if format == "csv":
             # Générer un CSV
@@ -523,18 +621,22 @@ async def export_equipments(data: dict):
             writer.writeheader()
             writer.writerows(export_data)
 
+            # Sauvegarder le fichier dans le dossier temporaire
+            with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+                f.write(output.getvalue())
+            
             content = output.getvalue().encode('utf-8-sig')  # Avec BOM pour Excel
             media_type = "text/csv"
-            filename = f"export-{datetime.now().strftime('%Y%m%d')}.csv"
+            
         else:
             # Générer un XLSX
             import pandas as pd
             import io
 
             df = pd.DataFrame(export_data)
-            output = io.BytesIO()
-
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            
+            # Sauvegarder le fichier dans le dossier temporaire
+            with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
                 df.to_excel(writer, sheet_name='Équipements', index=False)
 
                 # Ajuster les largeurs de colonnes
@@ -542,24 +644,143 @@ async def export_equipments(data: dict):
                 for i, col in enumerate(df.columns):
                     max_width = max(df[col].astype(str).map(len).max(), len(col))
                     worksheet.set_column(i, i, max_width + 2)
-
+            
+            # Pour la réponse HTTP
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='Équipements', index=False)
+            
             content = output.getvalue()
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            filename = f"export-{datetime.now().strftime('%Y%m%d')}.xlsx"
 
-        # Enregistrer l'historique d'export (dans une vraie application)
-        # export_id = save_export_history(filename, format, len(equipments))
+        # Enregistrer les métadonnées du fichier exporté (dans une vraie application, 
+        # cela serait fait dans une base de données)
+        export_metadata = {
+            "id": f"exp-{file_id}",
+            "filename": filename,
+            "dateExported": datetime.now().isoformat(),
+            "format": format,
+            "equipmentCount": len(equipments),
+            "filePath": file_path
+        }
+        
+        logger.info(f"Fichier exporté sauvegardé: {file_path}")
+        logger.info(f"Métadonnées d'export: {export_metadata}")
 
         # Retourner le fichier
         return Response(
             content=content,
             media_type=media_type,
             headers={
-                "Content-Disposition": f"attachment; filename={filename}"
+                "Content-Disposition": f"attachment; filename={filename}",
+                "X-Export-ID": export_metadata["id"],
+                "X-Export-Path": file_path
             }
         )
     except HTTPException as he:
         raise he
     except Exception as e:
-        logging.error(f"Erreur lors de l'export des équipements: {e}")
+        logger.error(f"Erreur lors de l'export des équipements: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/detect-headers")
+async def detect_headers(file: UploadFile = File(...)):
+    """Détecte les en-têtes d'un fichier CSV ou Excel sans le valider complètement."""
+    try:
+        # Sauvegarder temporairement le fichier
+        temp_file_path = os.path.join(TEMP_DIR, file.filename)
+        with open(temp_file_path, "wb") as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            await file.seek(0)  # Réinitialiser le curseur du fichier
+
+        # Déterminer le type de fichier et extraire les en-têtes
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        
+        if file_extension == ".csv":
+            handler = CsvHandler(temp_file_path)
+        elif file_extension in [".xlsx", ".xls"]:
+            handler = XlsxHandler(temp_file_path)
+        else:
+            raise HTTPException(status_code=400, detail="Format de fichier non supporté")
+        
+        # Lire seulement les en-têtes du fichier
+        detected_columns = handler.get_headers()
+        
+        # Nettoyer le fichier temporaire
+        os.remove(temp_file_path)
+        
+        return {
+            "detected_columns": detected_columns
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la détection des en-têtes: {str(e)}")
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la détection des en-têtes: {str(e)}")
+
+
+@app.post("/api/process-file-data")
+async def process_file_data(file: UploadFile = File(...)):
+    """
+    Traite le fichier chargé et renvoie les données formatées pour l'affichage.
+    """
+    try:
+        logger.info(f"Traitement du fichier: {file.filename}")
+        
+        # Sauvegarder temporairement le fichier
+        file_path = os.path.join(TEMP_DIR, f"upload_{uuid.uuid4()}{os.path.splitext(file.filename)[1]}")
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+            
+        # Déterminer le type de fichier
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        
+        data = []
+        if file_extension == '.csv':
+            handler = CsvHandler(file_path)
+            data = handler.load_data()
+        elif file_extension in ['.xlsx', '.xls']:
+            handler = XlsxHandler(file_path)
+            data = handler.load_data()
+        else:
+            os.remove(file_path)
+            raise HTTPException(status_code=400, detail="Format de fichier non supporté")
+        
+        # Nettoyer le fichier temporaire
+        os.remove(file_path)
+        
+        # Formater les données pour correspondre à la structure attendue par le frontend
+        equipments = []
+        for idx, row in enumerate(data):
+            equipment = {
+                "id": f"eq-{idx+1}",
+                "equipmentType": row.get("type", "Inconnu"),
+                "manufacturer": "Non spécifié",  # Cette information n'est pas dans G4IT_COLUMN_SPECS
+                "model": row.get("modele", "Inconnu"),
+                "quantity": int(row.get("quantite", "1")) if row.get("quantite", "").isdigit() else 1,
+                "cpu": row.get("nbCoeur", None),
+                "ram": None,  # Pas dans G4IT_COLUMN_SPECS
+                "storage": None,  # Pas dans G4IT_COLUMN_SPECS
+                "purchaseYear": row.get("dateAchat", None)[:4] if row.get("dateAchat") else None,
+                "eol": row.get("dateRetrait", None)[:4] if row.get("dateRetrait") else None,
+                # Ajouter d'autres champs selon votre modèle de données
+            }
+            equipments.append(equipment)
+            
+        # Préparer la réponse paginée
+        total_items = len(equipments)
+        # On renvoie toutes les données, la pagination se fera côté frontend
+        
+        return {
+            "equipments": equipments,
+            "total_items": total_items,
+            "total_pages": 1,  # Pagination côté frontend
+            "page": 1,
+            "limit": total_items
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement du fichier: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du fichier: {str(e)}")

@@ -1,4 +1,6 @@
+import logging
 import openpyxl
+import pandas as pd
 from .utils import validate_columns, G4IT_COLUMN_SPECS
 
 class XlsxHandler:
@@ -262,3 +264,11 @@ class XlsxHandler:
                 "is_valid": False,
                 "general_error": f"Erreur lors de la validation: {str(e)}"
             }
+
+    def get_headers(self):
+        try:
+            df = pd.read_excel(self.file)
+            return df.columns.tolist()
+        except Exception as e:
+            logging.error(f"Erreur lors de la lecture des en-têtes Excel: {str(e)}")
+            raise ValueError(f"Format Excel invalide: {str(e)}")

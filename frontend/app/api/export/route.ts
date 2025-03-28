@@ -66,27 +66,93 @@ export async function POST(request: NextRequest) {
 
 // Fonction pour générer un fichier d'export
 function generateExportFile(equipments: any[], format: string): Buffer {
-  // Transformer les équipements en format plat pour l'export
-  const dataForExport = equipments.map(eq => ({
-    'Type d\'équipement': eq.equipmentType,
-    'Fabricant': eq.manufacturer,
-    'Modèle': eq.model,
-    'Quantité': eq.quantity,
-    'CPU': eq.cpu || '',
-    'RAM': eq.ram || '',
-    'Stockage': eq.storage || '',
-    'Année d\'achat': eq.purchaseYear || '',
-    'Fin de vie': eq.eol || '',
-    'IDs d\'origine': eq.originalIds ? eq.originalIds.join(', ') : ''
-  }));
-
+  // Vérifier si les équipements sont au format mappé
+  const isMappedFormat = equipments.length > 0 && 'nomEquipementPhysique' in equipments[0];
+  
   if (format === 'csv') {
     // Générer un CSV
-    const csv = Papa.unparse(dataForExport);
+    let csv: string;
+    
+    if (isMappedFormat) {
+      // Format mappé
+      const mappedData = equipments.map(eq => ({
+        'Nom Équipement': eq.nomEquipementPhysique || '',
+        'Type': eq.type || '',
+        'Modèle': eq.modele || '',
+        'Quantité': eq.quantite || '',
+        'Datacenter': eq.nomCourtDatacenter || '',
+        'Statut': eq.statut || '',
+        'Pays': eq.paysDUtilisation || '',
+        'Date achat': eq.dateAchat || '',
+        'Date retrait': eq.dateRetrait || '',
+        'Nb. Coeur': eq.nbCoeur || '',
+        'Taux Utilisation': eq.tauxUtilisation || '',
+        'Consommation': eq.consoElecAnnuelle || ''
+      }));
+      
+      csv = Papa.unparse({
+        fields: Object.keys(mappedData[0] || {}),
+        data: mappedData
+      });
+    } else {
+      // Format standard
+      const standardData = equipments.map(eq => ({
+        'Type d\'équipement': eq.equipmentType,
+        'Fabricant': eq.manufacturer,
+        'Modèle': eq.model,
+        'Quantité': eq.quantity,
+        'CPU': eq.cpu || '',
+        'RAM': eq.ram || '',
+        'Stockage': eq.storage || '',
+        'Année d\'achat': eq.purchaseYear || '',
+        'Fin de vie': eq.eol || '',
+        'IDs d\'origine': eq.originalIds ? eq.originalIds.join(', ') : ''
+      }));
+      
+      csv = Papa.unparse({
+        fields: Object.keys(standardData[0] || {}),
+        data: standardData
+      });
+    }
+    
     return Buffer.from(csv);
   } else {
     // Générer un XLSX
-    const worksheet = XLSX.utils.json_to_sheet(dataForExport);
+    let worksheetData;
+    
+    if (isMappedFormat) {
+      // Format mappé
+      worksheetData = equipments.map(eq => ({
+        'Nom Équipement': eq.nomEquipementPhysique || '',
+        'Type': eq.type || '',
+        'Modèle': eq.modele || '',
+        'Quantité': eq.quantite || '',
+        'Datacenter': eq.nomCourtDatacenter || '',
+        'Statut': eq.statut || '',
+        'Pays': eq.paysDUtilisation || '',
+        'Date achat': eq.dateAchat || '',
+        'Date retrait': eq.dateRetrait || '',
+        'Nb. Coeur': eq.nbCoeur || '',
+        'Taux Utilisation': eq.tauxUtilisation || '',
+        'Consommation': eq.consoElecAnnuelle || ''
+      }));
+    } else {
+      // Format standard
+      worksheetData = equipments.map(eq => ({
+        'Type d\'équipement': eq.equipmentType,
+        'Fabricant': eq.manufacturer,
+        'Modèle': eq.model,
+        'Quantité': eq.quantity,
+        'CPU': eq.cpu || '',
+        'RAM': eq.ram || '',
+        'Stockage': eq.storage || '',
+        'Année d\'achat': eq.purchaseYear || '',
+        'Fin de vie': eq.eol || '',
+        'IDs d\'origine': eq.originalIds ? eq.originalIds.join(', ') : ''
+      }));
+    }
+    
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Équipements');
 

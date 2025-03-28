@@ -537,6 +537,32 @@ def get_consolidated_equipments():
         logging.error(f"Erreur lors de la récupération des équipements consolidés: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/download-file/{filename}")
+async def download_specific_file(filename: str):
+    """
+    Télécharge un fichier spécifique depuis le répertoire temporaire.
+    
+    Args:
+        filename (str): Nom du fichier à télécharger
+        
+    Returns:
+        FileResponse: Le fichier à télécharger
+    """
+    file_path = os.path.join(TEMP_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Fichier '{filename}' non trouvé")
+    
+    # Vérification de sécurité pour éviter la traversée de répertoire
+    if not os.path.normpath(file_path).startswith(TEMP_DIR):
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/octet-stream"
+    )
+
 @app.post("/api/export", response_class=Response)
 async def export_equipments(data: dict):
     """

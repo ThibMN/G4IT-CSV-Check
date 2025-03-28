@@ -419,13 +419,20 @@ export default function Dashboard() {
                                   <li>Procéder au mapping manuel des colonnes existantes</li>
                                 </ul>
                               </>
+                            ) : validationReport.typeErrors && validationReport.typeErrors.length > 0 ? (
+                              <>
+                                <p className="text-amber-600 text-sm mt-1">
+                                  Votre fichier contient des erreurs de format, mais vous pouvez quand même procéder au mapping des colonnes.
+                                  Les erreurs de données devront être corrigées ultérieurement.
+                                </p>
+                              </>
                             ) : (
                               <p className="text-amber-600 text-sm mt-1">
                                 Votre fichier contient des erreurs de format qui doivent être corrigées avant de continuer.
                               </p>
                             )}
                             <div className="mt-3 flex gap-2">
-                              {/* Autoriser l'accès au mapping même si le fichier a des erreurs mais contient des colonnes */}
+                              {/* Autoriser l'accès au mapping pour tous les types d'erreurs tant qu'il y a des colonnes */}
                               {validationReport.detectedColumns && validationReport.detectedColumns.length > 0 && (
                                 <Button 
                                   variant="outline"

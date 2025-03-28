@@ -1,153 +1,116 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, Loader2, Upload } from "lucide-react";
+import { Search, Filter, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useFileStore } from "@/store/file-store";
-import { useRouter } from "next/navigation";
+import { parseFile } from "@/lib/file-parser"; // Assurez-vous que vous avez cette fonction
 
 type Equipment = {
-  id: string;
-  equipmentType: string;
-  manufacturer: string;
-  model: string;
-  quantity: number;
-  cpu?: string;
-  ram?: string;
-  storage?: string;
-  purchaseYear?: string;
-  eol?: string;
+  id?: string;
+  nomEquipementPhysique: string;
+  modele: string;
+  quantite: number;
+  nomCourtDatacenter: string;
+  type: string;
+  statut: string;
+  paysDUtilisation: string;
+  dateAchat?: string;
+  dateRetrait?: string;
+  dureeUsageInterne?: string;
+  dureeUsageAmont?: string;
+  dureeUsageAval?: string;
+  consoElecAnnuelle?: string;
+  utilisateur?: string;
+  nomSourceDonnee?: string;
+  nomEntite?: string;
+  nbCoeur?: number;
+  nbJourUtiliseAn?: number;
+  goTelecharge?: number;
+  modeUtilisation?: string;
+  tauxUtilisation?: string;
+  qualite?: string;
+  [key: string]: any; // Pour permettre l'accès dynamique aux propriétés
 };
 
 export default function EquipmentPage() {
+  // États pour les données et les filtres
   const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [allEquipments, setAllEquipments] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [allEquipments, setAllEquipments] = useState<Equipment[]>([]);
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   
-  const { currentFile } = useFileStore();
-  const router = useRouter();
+  // Récupérer le fichier et les colonnes détectées du store
+  const { currentFile, detectedColumns } = useFileStore();
   
+  // Charger les données du fichier au montage du composant
   useEffect(() => {
     if (currentFile) {
-      processUploadedFile();
+      loadFileData(currentFile);
     } else {
+      // Si pas de fichier, charger des données de test
       fetchEquipments();
     }
   }, [currentFile]);
-  
+
+  // Effet pour appliquer les filtres quand ils changent
   useEffect(() => {
     if (allEquipments.length > 0) {
-      applyFiltersAndPagination();
+      applyFiltersAndPagination(allEquipments);
     }
-  }, [currentPage, searchTerm, filterType, allEquipments]);
-  
-  const processUploadedFile = async () => {
+  }, [currentPage, searchTerm, filterType]);
+
+  // Fonction pour charger les données du fichier
+  const loadFileData = async (file: File) => {
     try {
       setIsLoading(true);
       setError(null);
+
+      // Analyser le fichier CSV chargé
+      const result = await parseFile(file);
       
-      if (!currentFile) {
-        setError("Aucun fichier n'est disponible. Veuillez retourner au dashboard pour en charger un.");
+      if (result.error) {
+        setError(`Erreur lors de l'analyse du fichier: ${result.error}`);
         setIsLoading(false);
         return;
       }
       
-      const formData = new FormData();
-      formData.append('file', currentFile);
+      // Convertir les données CSV en objets Equipment
+      const data = result.data as Equipment[];
       
-      const response = await fetch('/api/process-uploaded-file', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      setAllEquipments(data.equipments || []);
-      
-      applyFiltersAndPagination(data.equipments);
-      
-    } catch (err: any) {
-      console.error("Erreur lors du traitement du fichier:", err);
-      setError("Impossible de traiter le fichier. " + (err.message || "Veuillez réessayer."));
+      setAllEquipments(data);
+      applyFiltersAndPagination(data);
+    } catch (err) {
+      console.error("Erreur lors du chargement du fichier:", err);
+      setError("Impossible de charger les données du fichier.");
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const applyFiltersAndPagination = (data = allEquipments) => {
-    let filteredData = [...data];
-    
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filteredData = filteredData.filter(eq =>
-        (eq.model && eq.model.toLowerCase().includes(term)) ||
-        (eq.manufacturer && eq.manufacturer.toLowerCase().includes(term)) ||
-        (eq.equipmentType && eq.equipmentType.toLowerCase().includes(term))
-      );
-    }
-    
-    if (filterType) {
-      filteredData = filteredData.filter(eq => eq.equipmentType === filterType);
-    }
-    
-    const itemsPerPage = 10;
-    const totalItems = filteredData.length;
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedData = filteredData.slice(startIndex, endIndex);
-    
-    setEquipments(paginatedData);
-    setTotalPages(totalPages || 1);
-  };
 
+  // Fonction pour récupérer les équipements (données de test)
   const fetchEquipments = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
+      // Simuler un appel API avec des données de test
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      // Données de test
       const mockData = getMockEquipments();
+      setAllEquipments(mockData); // Stocker toutes les données
 
-      let filteredData = [...mockData];
-
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filteredData = filteredData.filter(eq =>
-          eq.model.toLowerCase().includes(term) ||
-          eq.manufacturer.toLowerCase().includes(term) ||
-          eq.equipmentType.toLowerCase().includes(term)
-        );
-      }
-
-      if (filterType) {
-        filteredData = filteredData.filter(eq => eq.equipmentType === filterType);
-      }
-
-      const itemsPerPage = 10;
-      const totalItems = filteredData.length;
-      const totalPages = Math.ceil(totalItems / itemsPerPage);
-
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-      const paginatedData = filteredData.slice(startIndex, endIndex);
-
-      setEquipments(paginatedData);
-      setTotalPages(totalPages || 1);
+      // Appliquer les filtres et la pagination
+      applyFiltersAndPagination(mockData);
     } catch (err) {
       console.error("Erreur lors du chargement des équipements:", err);
       setError("Impossible de charger les équipements. Veuillez réessayer.");
@@ -156,77 +119,96 @@ export default function EquipmentPage() {
     }
   };
 
+  // Fonction pour obtenir des données de test
   const getMockEquipments = (): Equipment[] => {
     return Array(50).fill(null).map((_, index) => ({
       id: `eq-${index + 1}`,
-      equipmentType: ['Laptop', 'Desktop', 'Server', 'Monitor', 'Printer'][Math.floor(Math.random() * 5)],
-      manufacturer: ['Dell', 'HP', 'Lenovo', 'Apple', 'ASUS'][Math.floor(Math.random() * 5)],
-      model: `Model-${index + 1}`,
-      quantity: Math.floor(Math.random() * 10) + 1,
-      cpu: Math.random() > 0.3 ? ['Intel i5', 'Intel i7', 'AMD Ryzen 5', 'AMD Ryzen 7'][Math.floor(Math.random() * 4)] : undefined,
-      ram: Math.random() > 0.3 ? ['8GB', '16GB', '32GB'][Math.floor(Math.random() * 3)] : undefined,
-      storage: Math.random() > 0.3 ? ['256GB', '512GB', '1TB'][Math.floor(Math.random() * 3)] : undefined,
-      purchaseYear: Math.random() > 0.3 ? ['2020', '2021', '2022', '2023'][Math.floor(Math.random() * 4)] : undefined,
-      eol: Math.random() > 0.3 ? ['2025', '2026', '2027', '2028'][Math.floor(Math.random() * 4)] : undefined,
+      nomEquipementPhysique: `Équipement ${index + 1}`,
+      modele: `Modèle-${index + 1}`,
+      quantite: Math.floor(Math.random() * 10) + 1,
+      nomCourtDatacenter: ['DC-Paris', 'DC-Lyon', 'DC-Marseille', 'DC-Lille', 'DC-Bordeaux'][Math.floor(Math.random() * 5)],
+      type: ['PC Portable', 'PC Fixe', 'Serveur', 'Ecran', 'Réseau', 'Stockage', 'Smartphone'][Math.floor(Math.random() * 7)],
+      statut: ['Actif', 'En panne', 'En maintenance', 'Retiré'][Math.floor(Math.random() * 4)],
+      paysDUtilisation: ['France', 'Allemagne', 'Espagne', 'Italie', 'Royaume-Uni'][Math.floor(Math.random() * 5)],
+      dateAchat: Math.random() > 0.3 ? ['2020', '2021', '2022', '2023'][Math.floor(Math.random() * 4)] : undefined,
+      dateRetrait: Math.random() > 0.3 ? ['2025', '2026', '2027', '2028'][Math.floor(Math.random() * 4)] : undefined,
+      nbCoeur: Math.random() > 0.3 ? [4, 8, 16, 32, 64][Math.floor(Math.random() * 5)] : undefined,
+      tauxUtilisation: Math.random() > 0.3 ? ['25%', '50%', '75%', '90%'][Math.floor(Math.random() * 4)] : undefined,
+      consoElecAnnuelle: Math.random() > 0.3 ? ['120kWh', '240kWh', '480kWh', '960kWh'][Math.floor(Math.random() * 4)] : undefined
     }));
   };
 
+  // Fonction pour changer de page
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber);
   };
 
+  // Fonction pour rechercher
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
+    setCurrentPage(1); // Réinitialiser à la première page
   };
 
+  // Fonction pour réinitialiser les filtres
   const resetFilters = () => {
     setSearchTerm("");
     setFilterType("");
     setCurrentPage(1);
   };
 
-  const goToDashboard = () => {
-    router.push('/dashboard');
+  // Correction de la fonction applyFiltersAndPagination
+  const applyFiltersAndPagination = (data: Equipment[]) => {
+    // Filtrer les données
+    let filteredData = [...data];
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredData = filteredData.filter(eq => {
+        // Rechercher dans toutes les colonnes textuelles
+        return Object.entries(eq).some(([key, value]) => {
+          if (typeof value === 'string') {
+            return value.toLowerCase().includes(term);
+          }
+          return false;
+        });
+      });
+    }
+
+    if (filterType) {
+      filteredData = filteredData.filter(eq => eq.type === filterType);
+    }
+
+    // Déterminer les colonnes disponibles
+    if (filteredData.length > 0) {
+      const firstItem = filteredData[0];
+      // Utiliser les colonnes détectées du store si disponibles, sinon extraire des données
+      const columns = detectedColumns.length > 0 
+        ? detectedColumns 
+        : Object.keys(firstItem).filter(key => key !== 'id');
+      
+      setAvailableColumns(columns);
+    } else {
+      setAvailableColumns([]); // Réinitialiser si aucun résultat
+    }
+
+    // Pagination
+    const itemsPerPage = 10;
+    const totalItems = filteredData.length;
+    const calculatedTotalPages = Math.ceil(totalItems / itemsPerPage);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    setEquipments(paginatedData);
+    setTotalPages(calculatedTotalPages || 1);
   };
 
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Équipements</h1>
 
-      {!currentFile && !isLoading && (
-        <Card className="mb-6">
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <h3 className="font-medium">Aucun fichier chargé</h3>
-              <p className="text-sm text-gray-500">
-                Vous visualisez des données de démonstration. Chargez un fichier pour voir vos propres données.
-              </p>
-            </div>
-            <Button onClick={goToDashboard}>
-              <Upload className="h-4 w-4 mr-2" />
-              Charger un fichier
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {currentFile && (
-        <Card className="mb-6">
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <h3 className="font-medium">Fichier chargé: {currentFile.name}</h3>
-              <p className="text-sm text-gray-500">
-                Vous visualisez les données de votre fichier.
-              </p>
-            </div>
-            <Button variant="outline" onClick={goToDashboard}>
-              Changer de fichier
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Erreur */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
           <h3 className="font-medium text-red-800">{error}</h3>
@@ -241,6 +223,7 @@ export default function EquipmentPage() {
         </div>
       )}
 
+      {/* Filtres */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Filtrer les équipements</CardTitle>
@@ -268,11 +251,13 @@ export default function EquipmentPage() {
                 className="rounded-md border border-gray-300 px-3 py-2"
               >
                 <option value="">Tous les types</option>
-                <option value="Laptop">Laptops</option>
-                <option value="Desktop">Desktops</option>
-                <option value="Server">Serveurs</option>
-                <option value="Monitor">Écrans</option>
-                <option value="Printer">Imprimantes</option>
+                <option value="PC Portable">PC Portables</option>
+                <option value="PC Fixe">PC Fixes</option>
+                <option value="Serveur">Serveurs</option>
+                <option value="Ecran">Écrans</option>
+                <option value="Réseau">Équipements réseau</option>
+                <option value="Stockage">Stockage</option>
+                <option value="Smartphone">Smartphones</option>
               </select>
 
               <Button
@@ -288,6 +273,7 @@ export default function EquipmentPage() {
         </CardContent>
       </Card>
 
+      {/* Tableau d'équipements */}
       <Card>
         <CardHeader>
           <CardTitle>Liste des équipements</CardTitle>
@@ -306,29 +292,49 @@ export default function EquipmentPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Fabricant</TableHead>
-                    <TableHead>Modèle</TableHead>
-                    <TableHead>Quantité</TableHead>
-                    <TableHead>CPU</TableHead>
-                    <TableHead>RAM</TableHead>
-                    <TableHead>Stockage</TableHead>
-                    <TableHead>Achat</TableHead>
-                    <TableHead>Fin de vie</TableHead>
+                    {/* Afficher dynamiquement les en-têtes de colonnes basées sur les colonnes disponibles */}
+                    {availableColumns.map(column => {
+                      // Conversion en noms plus conviviaux pour l'affichage
+                      const displayNames: {[key: string]: string} = {
+                        nomEquipementPhysique: "Nom équipement",
+                        modele: "Modèle",
+                        quantite: "Quantité",
+                        nomCourtDatacenter: "Datacenter",
+                        type: "Type",
+                        statut: "Statut",
+                        paysDUtilisation: "Pays",
+                        dateAchat: "Date d'achat",
+                        dateRetrait: "Date de retrait",
+                        dureeUsageInterne: "Durée usage interne",
+                        dureeUsageAmont: "Durée usage amont",
+                        dureeUsageAval: "Durée usage aval",
+                        consoElecAnnuelle: "Conso. électrique",
+                        utilisateur: "Utilisateur",
+                        nomSourceDonnee: "Source de données",
+                        nomEntite: "Entité",
+                        nbCoeur: "Nb cœurs",
+                        nbJourUtiliseAn: "Jours d'utilisation/an",
+                        goTelecharge: "Go téléchargés",
+                        modeUtilisation: "Mode d'utilisation",
+                        tauxUtilisation: "Taux utilisation",
+                        qualite: "Qualité"
+                      };
+                      
+                      return (
+                        <TableHead key={column}>{displayNames[column] || column}</TableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {equipments.map((equipment) => (
-                    <TableRow key={equipment.id}>
-                      <TableCell>{equipment.equipmentType}</TableCell>
-                      <TableCell>{equipment.manufacturer}</TableCell>
-                      <TableCell>{equipment.model}</TableCell>
-                      <TableCell>{equipment.quantity}</TableCell>
-                      <TableCell>{equipment.cpu || '-'}</TableCell>
-                      <TableCell>{equipment.ram || '-'}</TableCell>
-                      <TableCell>{equipment.storage || '-'}</TableCell>
-                      <TableCell>{equipment.purchaseYear || '-'}</TableCell>
-                      <TableCell>{equipment.eol || '-'}</TableCell>
+                  {equipments.map((equipment, index) => (
+                    <TableRow key={equipment.id || index}>
+                      {/* Afficher dynamiquement les cellules basées sur les colonnes disponibles */}
+                      {availableColumns.map(column => (
+                        <TableCell key={column}>
+                          {equipment[column] !== undefined ? equipment[column] : '-'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -338,6 +344,7 @@ export default function EquipmentPage() {
         </CardContent>
       </Card>
 
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
           <div className="flex space-x-1">

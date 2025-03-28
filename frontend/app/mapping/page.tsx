@@ -561,7 +561,7 @@ export default function HeaderMapping() {
             <CardHeader>
               <CardTitle>Importation de fichier</CardTitle>
               <CardDescription>
-                Commencez par importer votre fichier CSV ou Excel pour détecter ses colonnes
+                Commencez par importer votre fichier CSV ou Excel pour détecter ses colonnes.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -578,6 +578,16 @@ export default function HeaderMapping() {
           </Card>
         ) : (
           <>
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Associez les colonnes de votre fichier</CardTitle>
+                <CardDescription>
+                  Pour chaque colonne détectée dans votre fichier, sélectionnez le champ correspondant dans le système G4IT.
+                  Les champs obligatoires doivent tous être associés pour pouvoir continuer.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
             {!areRequiredFieldsMapped() && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-6 flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />

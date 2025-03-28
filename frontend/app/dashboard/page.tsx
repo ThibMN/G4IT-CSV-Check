@@ -283,8 +283,12 @@ export default function Dashboard() {
   };
 
   const handleContinueToMapping = () => {
-    if (validationReport?.isValid) {
+    // Permettre le passage au mapping même si le fichier n'est pas complètement valide
+    // tant que des colonnes ont été détectées
+    if (validationReport?.detectedColumns && validationReport.detectedColumns.length > 0) {
       router.push('/mapping');
+    } else {
+      setErrorMessage("Le fichier chargé ne contient aucune colonne détectable");
     }
   };
 
@@ -403,11 +407,40 @@ export default function Dashboard() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                            <p className="text-red-800 font-medium">Fichier invalide</p>
-                            <p className="text-red-600 text-sm mt-1">
-                              Votre fichier contient des erreurs qui doivent être corrigées avant de continuer.
-                            </p>
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                            <p className="text-amber-800 font-medium">Fichier avec des problèmes</p>
+                            {validationReport.missingColumns && validationReport.missingColumns.length > 0 ? (
+                              <>
+                                <p className="text-amber-600 text-sm mt-1">
+                                  Certaines colonnes requises semblent manquantes. Vous pouvez soit:
+                                </p>
+                                <ul className="list-disc pl-5 mt-1 text-amber-600 text-sm">
+                                  <li>Corriger votre fichier source et le recharger</li>
+                                  <li>Procéder au mapping manuel des colonnes existantes</li>
+                                </ul>
+                              </>
+                            ) : (
+                              <p className="text-amber-600 text-sm mt-1">
+                                Votre fichier contient des erreurs de format qui doivent être corrigées avant de continuer.
+                              </p>
+                            )}
+                            <div className="mt-3 flex gap-2">
+                              {/* Autoriser l'accès au mapping même si le fichier a des erreurs mais contient des colonnes */}
+                              {validationReport.detectedColumns && validationReport.detectedColumns.length > 0 && (
+                                <Button 
+                                  variant="outline"
+                                  onClick={handleContinueToMapping}
+                                >
+                                  Procéder au mapping manuel
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost"
+                                onClick={handleRetry}
+                              >
+                                Recharger un fichier
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>

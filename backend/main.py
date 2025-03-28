@@ -9,7 +9,7 @@ import logging
 import csv
 import re
 import pandas as pd
-from backend.models import CsvHandler, XlsxHandler, check_file, validate_columns, G4IT_COLUMN_SPECS
+from models import CsvHandler, XlsxHandler, check_file, validate_columns, G4IT_COLUMN_SPECS
 from datetime import datetime
 
 # Configurer le logging

@@ -123,13 +123,43 @@ export default function ExportPage() {
       setError(null);
       setExportSuccess(null);
 
-      // Simuler un export
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Appeler l'API backend pour exporter les équipements
+      const response = await axios.post(
+        'http://localhost:8001/api/export',
+        {
+          format,
+          equipments: consolidatedEquipments
+        },
+        {
+          responseType: 'blob',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      // Mettre à jour l'historique d'export
+      // Extraire le nom de fichier de l'en-tête Content-Disposition
+      const contentDisposition = response.headers['content-disposition'];
+      const filenameMatch = contentDisposition && contentDisposition.match(/filename="?([^"]*)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : `export-${new Date().toISOString().slice(0, 10)}-${format}`;
+
+      // Extraire l'ID d'export de l'en-tête personnalisé
+      const exportId = response.headers['x-export-id'] || `exp-${Date.now()}`;
+
+      // Créer un URL pour le blob et déclencher le téléchargement
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Mettre à jour l'historique d'export avec le fichier réel
       const newExport: ExportHistory = {
-        id: `exp-${Date.now()}`,
-        filename: `export-${new Date().toISOString().slice(0, 10)}.${format}`,
+        id: exportId,
+        filename: filename,
         dateExported: new Date().toISOString(),
         format,
         equipmentCount: consolidatedEquipments.reduce((sum, eq) => sum + eq.quantity, 0)

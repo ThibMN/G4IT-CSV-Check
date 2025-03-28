@@ -151,9 +151,36 @@ export default function ExportPage() {
   };
 
   // Fonction pour télécharger un export de l'historique
-  const downloadExportFromHistory = (exportItem: ExportHistory) => {
-    // Dans une application réelle, on appellerait une API pour récupérer le fichier
-    alert(`Téléchargement du fichier ${exportItem.filename}...`);
+  const downloadExportFromHistory = async (exportItem: ExportHistory) => {
+    try {
+      setIsLoading(true);
+      
+      // Appeler l'API backend pour télécharger le fichier
+      const response = await axios.get(`http://localhost:8001/api/download-file/${exportItem.filename}`, {
+        responseType: 'blob', // Important pour recevoir des données binaires
+      });
+      
+      // Créer un URL pour le blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      
+      // Créer un élément <a> temporaire pour déclencher le téléchargement
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', exportItem.filename);
+      
+      // Ajouter au DOM, cliquer, puis nettoyer
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Libérer l'URL
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erreur lors du téléchargement du fichier:', error);
+      setError(`Impossible de télécharger le fichier ${exportItem.filename}. Veuillez réessayer.`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Fonction pour revenir à la page de consolidation

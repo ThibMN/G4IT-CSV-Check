@@ -95,9 +95,9 @@ export default function ExportPage() {
       setError(null);
       setExportSuccess(null);
 
-      // Appeler l'API backend pour exporter les équipements
+      // Appeler l'API backend directement (sans passer par votre middleware)
       const response = await axios.post(
-        'http://localhost:8001/api/export',
+        'http://localhost:8001/api/export',  // URL directe du backend
         {
           format,
           equipments: consolidatedEquipments
@@ -112,11 +112,28 @@ export default function ExportPage() {
 
       // Extraire le nom de fichier de l'en-tête Content-Disposition
       const contentDisposition = response.headers['content-disposition'];
-      const filenameMatch = contentDisposition && contentDisposition.match(/filename="?([^"]*)"?/);
-      const filename = filenameMatch ? filenameMatch[1] : `export-${new Date().toISOString().slice(0, 10)}-${format}`;
+      // Format attendu: attachment; filename="export-2023-09-20-12345678.csv"
+      let filename;
+      
+      if (contentDisposition) {
+        // Extraire le nom du fichier entre guillemets
+        const filenameRegex = /filename="([^"]+)"/;
+        const matches = filenameRegex.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+      
+      // Fallback si le nom n'est pas trouvé ou correctement formaté
+      if (!filename) {
+        const currentDate = new Date().toISOString().slice(0, 10);
+        filename = `export-${currentDate}.${format}`;
+      }
 
-      // Extraire l'ID d'export de l'en-tête personnalisé
-      const exportId = response.headers['x-export-id'] || `exp-${Date.now()}`;
+      // S'assurer que le fichier a l'extension correcte
+      if (!filename.endsWith(`.${format}`)) {
+        filename = `${filename}.${format}`;
+      }
 
       // Créer un URL pour le blob et déclencher le téléchargement
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -130,7 +147,7 @@ export default function ExportPage() {
 
       // Mettre à jour l'historique d'export avec le fichier réel
       const newExport: ExportHistory = {
-        id: exportId,
+        id: crypto.randomUUID().toString(),
         filename: filename,
         dateExported: new Date().toISOString(),
         format,

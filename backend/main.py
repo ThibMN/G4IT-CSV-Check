@@ -565,15 +565,7 @@ async def download_specific_file(filename: str):
 
 @app.post("/api/export", response_class=Response)
 async def export_equipments(data: dict):
-    """
-    Exporte les équipements consolidés au format CSV ou XLSX.
-
-    Args:
-        data (dict): Un dictionnaire contenant le format d'export et les équipements à exporter.
-
-    Returns:
-        Response: Le fichier CSV ou XLSX à télécharger avec des métadonnées.
-    """
+    """Exporte les équipements consolidés au format CSV ou XLSX."""
     try:
         format = data.get("format")
         equipments = data.get("equipments", [])
@@ -600,88 +592,57 @@ async def export_equipments(data: dict):
                 "IDs d'origine": ", ".join(eq.get("originalIds", []))
             })
 
-        # Créer un nom de fichier unique avec la date et un identifiant
+        # Créer un nom de fichier unique
         current_date = datetime.now().strftime("%Y-%m-%d")
-        file_id = str(uuid.uuid4())[:8]  # Utiliser les 8 premiers caractères de l'UUID
+        file_id = str(uuid.uuid4())[:8]
         filename = f"export-{current_date}-{file_id}.{format}"
         
-        # Chemin complet du fichier dans le dossier temporaire
+        # Chemin du fichier temporaire
         file_path = os.path.join(TEMP_DIR, filename)
         
         # Générer le fichier selon le format demandé
         if format == "csv":
-            # Générer un CSV
-            import csv
-            import io
-
-            output = io.StringIO()
-            fieldnames = export_data[0].keys() if export_data else []
-
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(export_data)
-
-            # Sauvegarder le fichier dans le dossier temporaire
-            with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
-                f.write(output.getvalue())
+            # Méthode simplifiée pour générer un CSV
+            import pandas as pd
+            df = pd.DataFrame(export_data)
+            df.to_csv(file_path, index=False, encoding='utf-8-sig')
             
-            content = output.getvalue().encode('utf-8-sig')  # Avec BOM pour Excel
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
             media_type = "text/csv"
             
         else:
-            # Générer un XLSX
+            # Générer un XLSX sans utiliser BytesIO
             import pandas as pd
-            import io
-
             df = pd.DataFrame(export_data)
+            df.to_excel(file_path, sheet_name='Équipements', index=False)
             
-            # Sauvegarder le fichier dans le dossier temporaire
-            with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='Équipements', index=False)
-
-                # Ajuster les largeurs de colonnes
-                worksheet = writer.sheets['Équipements']
-                for i, col in enumerate(df.columns):
-                    max_width = max(df[col].astype(str).map(len).max(), len(col))
-                    worksheet.set_column(i, i, max_width + 2)
+            with open(file_path, 'rb') as f:
+                content = f.read()
             
-            # Pour la réponse HTTP
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='Équipements', index=False)
-            
-            content = output.getvalue()
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-        # Enregistrer les métadonnées du fichier exporté (dans une vraie application, 
-        # cela serait fait dans une base de données)
-        export_metadata = {
-            "id": f"exp-{file_id}",
-            "filename": filename,
-            "dateExported": datetime.now().isoformat(),
-            "format": format,
-            "equipmentCount": len(equipments),
-            "filePath": file_path
+        # Log pour diagnostic
+        logger.info(f"Fichier exporté: {filename}, taille: {len(content)} octets")
+
+        # Métadonnées du fichier exporté 
+        export_id = f"exp-{file_id}"
+
+        # Retourner le fichier avec le bon type MIME et les bons en-têtes
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Export-ID": export_id,
+            "X-Content-Type-Options": "nosniff"
         }
         
-        logger.info(f"Fichier exporté sauvegardé: {file_path}")
-        logger.info(f"Métadonnées d'export: {export_metadata}")
-
-        # Retourner le fichier
-        return Response(
-            content=content,
-            media_type=media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}",
-                "X-Export-ID": export_metadata["id"],
-                "X-Export-Path": file_path
-            }
-        )
-    except HTTPException as he:
-        raise he
+        # Créer manuellement la réponse pour éviter les problèmes d'encodage
+        return Response(content=content, media_type=media_type, headers=headers)
+        
     except Exception as e:
-        logger.error(f"Erreur lors de l'export des équipements: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log détaillé de l'erreur
+        logger.error(f"Erreur lors de l'export: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'export: {str(e)}")
 
 @app.post("/api/detect-headers")
 async def detect_headers(file: UploadFile = File(...)):

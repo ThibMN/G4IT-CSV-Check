@@ -25,7 +25,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Essayer d'appeler le backend
+      // Générer un nom de fichier avec timestamp et extension
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+      const filename = `export-${timestamp}.${format}`;
+
+      // Appeler le backend pour l'export
       const response = await axios.post(
         `${BACKEND_URL}/api/export`,
         { format, equipments },
@@ -35,25 +39,28 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      // Retourner directement la réponse du backend
+      // IMPORTANT: Utilisez l'en-tête Content-Disposition du backend s'il existe, 
+      // sinon utilisez le nom de fichier généré
+      const contentDisposition = response.headers['content-disposition'];
+      const backendFilename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : null;
+
+      // Déterminer le bon type MIME
+      const contentType = format === 'csv' 
+        ? 'text/csv' 
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+      // Renvoyer la réponse avec des en-têtes corrects
       return new NextResponse(response.data, {
         headers: {
-          'Content-Type': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename=export.${format}`
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${backendFilename || filename}"` 
         }
       });
     } catch (error) {
       console.error('Erreur lors de l\'appel au backend pour l\'export:', error);
-
-      // Générer le fichier côté frontend en cas d'erreur
-      const fileData = generateExportFile(equipments, format);
-
-      return new NextResponse(fileData, {
-        headers: {
-          'Content-Type': format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename=export.${format}`
-        }
-      });
+      throw error;
     }
   } catch (error) {
     console.error('Erreur lors de l\'export:', error);
